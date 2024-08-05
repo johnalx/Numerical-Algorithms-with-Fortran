@@ -1,0 +1,320 @@
+C[BA*)
+C[LE*)
+C[LE*)
+C[LE*)
+C[FE{F 4.11.1}{Systems with a Symm.\ Cyclically Tridiagonal
+C[             Matrix}
+C[            {Systems with a Symmetric Cyclically Tridiagonal
+C[             Matrix}*)
+C[LE*)
+      SUBROUTINE CYCTR(N,DL,DM,DU,RL,CR,RS,X,MARK)
+C[IX{CYCTR}*)
+C
+C*****************************************************************
+C                                                                *
+C     Solving a linear system of equations                       *
+C                   A * X = RS                                   *
+C     for a cyclically tridiagonal, strongly nonsingular matrix  *
+C     A.                                                         *
+C[BE*)
+C     The system matrix A is defined via five N-vectors DL,      *
+C     DM, DU, RL and CR. The set of equations has the following  *
+C     form:                                                      *
+C                                                                *
+C     DM(1)*X(1)+DU(1)*X(2)+CR(1)*X(N)       =       RS(1)       *
+C                                                                *
+C     DL(I)*X(I-1)+DM(I)*X(I)+DU(I)*X(I+1)   =       RS(I)       *
+C            for I = 2, ..., N-1, and                            *
+C                                                                *
+C     RL(1)*X(1)+DL(N)*X(N-1)+DM(N)*X(N)     =       RS(N)       *
+C                                                                *
+C                                                                *
+C                                                                *
+C     INPUT PARAMETERS:                                          *
+C     =================                                          *
+C     N   : number of equations; N > 2                           *
+C     DL  : N-vector DL(1:N); lower co-diagonal                  *
+C           DL(2), ... , DL(N)                                   *
+C     DM  : N-vector DM(1:N); main diagonal                      *
+C           DM(1), ... , DM(N)                                   *
+C     DU  : N-vector DU(1:N); upper co-diagonal                  *
+C           DU(1), ... , DU(N-1)                                 *
+C     RL  : N-vector RL(1:N); last row RL(1) with diagonal and   *
+C                             co-diagonal elements omitted       *
+C     CR  : N-vector CR(1:N); right most column RS(1) with       *
+C                             diagonal and codiagonal elements   *
+C                             omitted                            *
+C     RS  : N-vector RS(1:N); the right hand side                *
+C                                                                *
+C                                                                *
+C     OUTPUT PARAMETERS:                                         *
+C     ==================                                         *
+C     DL   :) overwritten with auxiliary vectors that define the *
+C     DM   :) factorization matrices of the cyclically           *
+C     DU   :) tridiagonal matrix                                 *
+C     RL   :)                                                    *
+C     CR   :)                                                    *
+C     X    : N-vector X(1:N); the solution of the system of      *
+C            equations                                           *
+C     MARK : error parameter                                     *
+C            MARK=-1 : condition N > 2 is not satified           *
+C            MARK= 0 : numerically the matrix is not strongly    *
+C                      nonsingular                               *
+C            MARK= 1 : everything is o.k.                        *
+C                                                                *
+C                                                                *
+C     NOTE: If MARK = 1,  the determinant of A is given by:      *
+C              DET A = DM(1) * DM(2) * ... * DM(N).              *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: CYCTRP, CYCTRS, MACHPD                  *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author    : Gisela Engeln-Muellges                            *
+C  date      : 05.05.1988                                        *
+C  source    : FORTRAN 77                                        *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DOUBLE PRECISION DL(1:N),DM(1:N),DU(1:N),RL(1:N),CR(1:N),
+     +                 RS(1:N),X(1:N)
+      MARK = -1
+      IF (N .LT. 3) RETURN
+C
+C   factor the matrix A
+C
+      CALL CYCTRP(N,DL,DM,DU,RL,CR,MARK)
+C
+C   if MARK = 1, update and bachsubstitute
+C
+      IF (MARK .EQ. 1) THEN
+         CALL CYCTRS(N,DL,DM,DU,RL,CR,RS,X)
+      ENDIF
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE CYCTRP (N,DL,DM,DU,RL,CR,MARK)
+C[IX{CYCTRP}*)
+C
+C*****************************************************************
+C                                                                *
+C     Factor a cyclically tridiagonal, strongly nonsingular      *
+C     matrix A, that is given by five N-vectors DL, DM, DU, RL   *
+C     and CR, into its factors  L * R  by applying a special     *
+C     Gaussian elimination method. The form of the  system of    *
+C     equations is as described in SUBROUTINE CYCTR.             *
+C[BE*)
+C                                                                *
+C                                                                *
+C     INPUT PARAMETERS:                                          *
+C     =================                                          *
+C     N   : number of equations; N > 2                           *
+C     DL  : N-vector DL(1:N); lower co-diagonal                  *
+C           DL(2), ... , DL(N)                                   *
+C     DM  : N-vector DM(1:N); main diagonal                      *
+C           DM(1), ... , DM(N)                                   *
+C     DU  : N-vector DU(1:N); upper co-diagonal                  *
+C           DU(1), ... , DU(N-1)                                 *
+C     RL  : N-vector RL(1:N); last row RL(1) with diagonal and   *
+C                             co-diagonal elements omitted       *
+C     CR  : N-vector CR(1:N); right most column RS(1) with       *
+C                             diagonal and codiagonal elements   *
+C                             omitted                            *
+C                                                                *
+C                                                                *
+C     OUTPUT PARAMETERS:                                         *
+C     ==================                                         *
+C     DL   :) overwritten with auxiliary vectors containing the  *
+C     DM   :) factors of the matrix A. The lower triangular      *
+C     DU   :) factor L is stored in DL, DM and RL, the unit      *
+C     RL   :) upper triangular matrix R is stored in DU and CR   *
+C     RS   :) with its main diagonal entries ( = 1) omitted.     *
+C     MARK : error parameter                                     *
+C            MARK=-1 : condition N > 2 is not satisfied          *
+C            MARK= 0 : numerically the matrix is not strongly    *
+C                      nonsingular                               *
+C            MARK= 1 : everything is o.k.                        *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: MACHPD                                  *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author    : Gisela Engeln-Muellges                            *
+C  date      : 05.05.1988                                        *
+C  source    : FORTRAN 77                                        *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DOUBLE PRECISION DL(1:N),DM(1:N),DU(1:N),RL(1:N),CR(1:N)
+C
+C   testing whether N > 2
+C
+      MARK = -1
+      IF (N .LT. 3) RETURN
+C
+C   computing the machine constant
+C
+      FMACHP = 1.0D0
+   10 FMACHP = 0.5D0 * FMACHP
+      IF (MACHPD(1.0D0+FMACHP) .EQ. 1) GOTO 10
+      FMACHP = FMACHP * 2.0D0
+C
+C   determining bounds for the relative error
+C
+      EPS = 4.0D0 * FMACHP
+C
+C   initializing the undefined vector components
+C
+      DO 20 I=2,N
+         RL(I) = 0.0D0
+         CR(I) = 0.0D0
+   20 CONTINUE
+      DL(1) = 0.0D0
+      DU(N) = 0.0D0
+C
+C   checking for strong nonsingularity of the matrix for N=1
+C
+      ROW = DABS(DM(1)) + DABS(DU(1)) + DABS(CR(1))
+      IF (ROW .EQ. 0.0D0) THEN
+         MARK = 0
+         RETURN
+      ENDIF
+      D = 1.0D0/ROW
+      IF (DABS(DM(1))*D .LE. EPS) THEN
+         MARK = 0
+         RETURN
+      ENDIF
+C
+C   factoring the matrix A while checking for
+C   strong nonsingularity of A
+C
+      DU(1) = DU(1)/DM(1)
+      CR(1) = CR(1)/DM(1)
+      DO 30 I=2,N-1
+         ROW = DABS(DL(I)) + DABS(DM(I)) + DABS(DU(I))
+         IF (ROW .EQ. 0.0D0) THEN
+            MARK = 0
+            RETURN
+         END IF
+         D = 1.0D0/ROW
+         DM(I) = DM(I)-DL(I)*DU(I-1)
+         IF (DABS(DM(I))*D .LE. EPS) THEN
+            MARK = 0
+            RETURN
+         ENDIF
+         IF (I .LT. (N-1)) THEN
+            DU(I) = DU(I)/DM(I)
+            CR(I) = -DL(I)*CR(I-1)/DM(I)
+         ENDIF
+   30 CONTINUE
+      ROW = DABS(RL(1)) + DABS(DL(N)) + DABS(DM(N))
+      IF (ROW .EQ. 0.0D0) THEN
+         MARK = 0
+         RETURN
+      END IF
+      D = 1.0D0/ROW
+      DO 40 K=2,N-2
+         RL(K) = -RL(K-1)*DU(K-1)
+   40 CONTINUE
+      DL(N) = DL(N)-RL(N-2)*DU(N-2)
+      DU(N-1) = (DU(N-1)-DL(N-1)*CR(N-2))/DM(N-1)
+      S = 0.0D0
+      DO 50 J=1,N-2
+         S = S+RL(J)*CR(J)
+  50  CONTINUE
+      DM(N) = DM(N)-S-DL(N)*DU(N-1)
+      IF (DABS(DM(N))*D .LE. EPS) THEN
+         MARK = 0
+         RETURN
+      ENDIF
+      MARK = 1
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE CYCTRS (N,DL,DM,DU,RL,CR,RS,X)
+C[IX{CYCTRS}*)
+C
+C*****************************************************************
+C                                                                *
+C     Solving a linear system of equations                       *
+C               A * X = RS                                       *
+C     for a cyclically tridiagonal, strongly nonsingular matrix  *
+C     A, once its factors L, R have been calculated in           *
+C     SUBROUTINE CYCTRP.                                         *
+C[BE*)
+C     The elements of the lower triangular matrix L are stored   *
+C     in the vectors DL, DM, RL, while the elements of the unit  *
+C     upper triangular matrix R (except for the main diagonal)   *
+C     are stored in the vector DU and CR.                        *
+C                                                                *
+C                                                                *
+C     INPUT PARAMETERS:                                          *
+C     =================                                          *
+C     N   : number of equations; N > 2                           *
+C     DL  : N-vector DL(1:N); ) these vectors DL, ... , CR       *
+C     DM  : N-vector DM(1:N); ) contain the factors of the       *
+C     RL  : N-vector RL(1:N); ) matrix A.                        *
+C     DU  : N-vector DU(1:N); ) (output vectors of CYCTRP)       *
+C     CR  : N-vector CR(1:N); )                                  *
+C     RS  : N-vector RS(1:N); right hand side                    *
+C                                                                *
+C                                                                *
+C     OUTPUT PARAMETERS:                                         *
+C     ==================                                         *
+C     X   : N-vector X(1:N); the solution of the linear system   *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author   : Gisela Engeln-Muellges                             *
+C  date     : 05.05.1988                                         *
+C  source   : FORTRAN 77                                         *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DOUBLE PRECISION DL(1:N),DM(1:N),DU(1:N),RL(1:N),CR(1:N),
+     +                 RS(1:N),X(1:N)
+C
+C   updating
+C
+      RS(1)=RS(1)/DM(1)
+      DO 10 I=2,N-1
+        RS(I)=(RS(I)-RS(I-1)*DL(I))/DM(I)
+   10 CONTINUE
+      S=0.0D0
+      DO 20 J=1,N-2
+        S=S+RL(J)*RS(J)
+   20 CONTINUE
+      RS(N)=(RS(N)-S-DL(N)*RS(N-1))/DM(N)
+C
+C   backsubstitution
+C
+      X(N)=RS(N)
+      X(N-1)=RS(N-1)-X(N)*DU(N-1)
+      DO 30 I=N-2,1,-1
+         X(I)=RS(I)-DU(I)*X(I+1)-CR(I)*X(N)
+   30 CONTINUE
+      RETURN
+      END

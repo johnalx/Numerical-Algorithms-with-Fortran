@@ -1,0 +1,64 @@
+<html>
+<head>
+<title>fortra77/kap08/senorm.for</title>
+</head>
+<body>
+<a name="anfang"</a>
+<hr>
+<a href="#ende">End of file</a><br>
+<a href="../../inhalt.htm#fortra77kap08senormfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+<font size=+2>
+<pre>
+
+<a name="SENORM3"</a>      DOUBLE PRECISION FUNCTION SENORM (X, N)
+C
+C*****************************************************************
+C                                                                *
+C  The FUNCTION-subroutine SENORM computes the square of the     *
+C  euclidean norm of a real vector X of length N+1               *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C                                                                *
+C  X    (N+1)-vector X(0:N) containing the vector whose norm     *
+C       shall be computed                                        *
+C  N    number of components of the vector X                     *
+C                                                                *
+C  OUTPUT PARAMETER:                                             *
+C  =================                                             *
+C                                                                *
+C  none                                                          *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author   : Ilona Westermann                                   *
+C  date     : 09.01.1987                                         *
+C  source   : FORTRAN 77                                         *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      INTEGER N
+      DOUBLE PRECISION X(0:N)
+      SENORM = 0.0D0
+      DO 10 I=0,N
+         SENORM = SENORM + X(I) * X(I)
+   10 CONTINUE
+      RETURN
+      END
+</font>
+</pre>
+<a name="ende"</a>
+<hr>
+<a href="#anfang">Begin of file</a><br>
+<a href="../../inhalt.htm#fortra77kap08senormfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+</body>
+</html>

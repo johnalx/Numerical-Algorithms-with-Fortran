@@ -1,0 +1,4 @@
+00index.txt     all files in the current folder with short one line description
+readme.txt      detailed description of current folder
+fortra77/       folder with EFNUM source codes in FORTRAN 77
+quasif90/       folder with EFNUM source codes in quasi-Fortran 90

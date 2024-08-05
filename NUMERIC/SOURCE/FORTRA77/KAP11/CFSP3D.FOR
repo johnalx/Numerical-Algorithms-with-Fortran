@@ -1,0 +1,190 @@
+C[BA*)
+C[LE*)
+      SUBROUTINE CFSP3D (N,XN,FN,W,ALPHA,BETA,A,B,C,D,DL1,DL2,
+C[IX{CFSP3D}*)
+     +                   DU1,DU2,RS,H1,H,IERR)
+C
+C*****************************************************************
+C                                                                *
+C  CFSP3D computes the coefficients A(I), B(I), C(I), D(I),      *
+C  I=0, 1. ..., N-1, of a cubic fitting spline with prescribed   *
+C[BE*)
+C  third end point derivative.                                   *
+C  The spline is represented in the form:                        *
+C                                                                *
+C  S(X) = A(I) + B(I)(X-XN(I)) + C(I)(X-XN(I))**2 +              *
+C                              + D(I)(X-XN(I))**3                *
+C                                                                *
+C  for X in the interval [XN(I),XN(I+1)], I=0, 1, ..., N-1.      *
+C                                                                *
+C                                                                *
+C  ASSUMPTIONS:    1.         N > 4                              *
+C  ============    2.     XN(I) < XN(I+1), I=0, 1, ..., N-1      *
+C                  3.      W(I) > 0.0    , I=0, 1, ..., N        *
+C                                                                *
+C                                                                *
+C  REMARK:  CFSP3D should not be called directly, but rather via *
+C  =======  the subroutine CFSPNP. The subroutine CFSPNP also    *
+C           checks the above assumptions.                        *
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  N  :  Index of the last node                                  *
+C  XN :  vector XN(0:N); XN(I) is the Ith node, I = 0, ..., N    *
+C  FN :  vector FN(0:N); FN(I) is the data at the node XN(I)     *
+C  W  :  vector W(0:N);  W(I) is the weight of FN(I)             *
+C                                                                *
+C  ALPHA :  third end point derivative at XN(0)                  *
+C  BETA  :  third end point derivative at XN(N)                  *
+C                                                                *
+C                                                                *
+C  AUXILIARY VARIABLES:                                          *
+C  ====================                                          *
+C  H   :]                                                        *
+C  H1  :]  N-vectors H(0:N-1), H1(0:N-1)                         *
+C                                                                *
+C  DL1 :]                                                        *
+C  DL2 :]                                                        *
+C  DU1 :]  (N-1)-vectors dimensioned as  ..(1:N-1)               *
+C  DU2 :]                                                        *
+C  RS  :]                                                        *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  ==================                                            *
+C  A    :  Vector A(0:N) ]  The entries in positions 0 to N-1    *
+C  B    :  Vector B(0:N) ]  contain the spline coefficients for  *
+C  C    :  Vector C(0:N) ]  S. The entries in A(N), B(N), C(N)   *
+C  D    :  Vector D(0:N) ]  and D(N) are auxiliary variables.    *
+C                                                                *
+C  IERR :  error parameter                                       *
+C          =  0 :  All is o.k.                                   *
+C          = -1 :  N < 5                                         *
+C          =  1 :  FDIAG did not run correctly (matrix singular) *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  required subroutines: FDIAG                                   *
+C                                                                *
+C                                                                *
+C  Reference: Engeln-Mllges, G.; Reutter, F., [ENGE87].         *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author   : Gnter Palm                                        *
+C  Date     : 04.18.1988                                         *
+C  Source   : FORTRAN 77                                         *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DOUBLE PRECISION XN(0:N), FN(0:N), W(0:N), A(0:N), B(0:N),
+     +                 C(0:N), D(0:N), DL1(1:N-1), DL2(1:N-1),
+     +                 DU1(1:N-1), DU2(1:N-1), RS(1:N-1),
+     +                 H1(0:N-1), H(0:N-1)
+C
+C-----Computing the auxiliary variables
+C
+      DO 10 I=0,N-1,1
+        H(I)  = XN(I+1) - XN(I)
+        H1(I) = 1.0D0/H(I)
+        C(I)  = H1(I)*H1(I)
+        B(I)  = 6.0D0/W(I)
+   10 CONTINUE
+      B(N) = 6.0D0/W(N)
+C
+      DO 20 I=0,N-2,1
+        D(I) = H1(I) + H1(I+1)
+   20 CONTINUE
+C
+C-----Compute the system matrix elements (main and two co-diagonals)
+C     and the right-hand side for  A*C=RS with a five-diagonal matrix A.
+C
+C     second co-diagonal
+C
+      DO 30 I=3,N-1,1
+        DL2(I)   = B(I-1)*H1(I-2)*H1(I-1)
+        DU2(I-2) = DL2(I)
+   30 CONTINUE
+C
+C     first co-diagonal
+C
+      DUMMY1 = H(1) - B(2)*H1(1)*D(1)
+      DL1(2) = DUMMY1 - B(1)*C(1)
+      DU1(1) = DUMMY1 - B(1)*H1(1)*D(0)
+      DO 40 I=3,N-2,1
+        K = I-1
+        DL1(I) = H(K) - B(K)*H1(K)*D(K-1) - B(I)*H1(K)*D(K)
+        DU1(K) = DL1(I)
+   40 CONTINUE
+      DUMMY1   = H(N-2) - B(N-2)*H1(N-2)*D(N-3)
+      DL1(N-1) = DUMMY1 - B(N-1)*H1(N-2)*D(N-2)
+      DU1(N-2) = DUMMY1 - B(N-1)*C(N-2)
+C
+C     main diagonal
+C
+      A(1) = 3.0D0*H(0) + 2.0D0*H(1) + B(1)*H1(1)*D(0) + B(2)*C(1)
+      DO 50 I=2,N-2,1
+        K = I-1
+        A(I) = 2.0D0*(H(K)+H(I)) + B(K)*C(K) + B(I)*D(K)*D(K) +
+     +         B(I+1)*C(I)
+   50 CONTINUE
+      A(N-1) = 2.0D0*H(N-2) + 3.0D0*H(N-1) + B(N-2)*C(N-2) +
+     +         B(N-1)*H1(N-2)*D(N-2)
+C
+C     right-hand side
+C
+      C(0) = 0.5D0*ALPHA
+      C(N) = 0.5D0*BETA
+C
+      DUMMY2 = (FN(2)-FN(1))*H1(1)
+      DUMMY1 = (FN(3)-FN(2))*H1(2)
+      RS(1)  = 3.0D0*(DUMMY2 - (FN(1)-FN(0))*H1(0)) +
+     +         C(0)*(H(0)*H(0) - B(0)*H1(0) - B(1)*D(0))
+      RS(2)  = 3.0D0*(DUMMY1 - DUMMY2) + C(0)*B(1)*H1(1)
+      DO 60 I=3,N-3,1
+        DUMMY2 = (FN(I+1) - FN(I)) * H1(I)
+        RS(I)  = 3.0D0*(DUMMY2 - DUMMY1)
+        DUMMY1 = DUMMY2
+   60 CONTINUE
+      DUMMY2  = (FN(N-1) - FN(N-2))*H1(N-2)
+      RS(N-2) = 3.0D0*(DUMMY2 - DUMMY1) - C(N)*B(N-1)*H1(N-2)
+      RS(N-1) = 3.0D0*((FN(N) - FN(N-1))*H1(N-1) - DUMMY2) - C(N)*
+     +          (H(N-1)*H(N-1) - B(N-1)*D(N-2) - B(N)*H1(N-1))
+C
+C-----Compute the coefficients C(1) to C(N-1) by
+C     solving the linear system
+C
+      CALL FDIAG (N-1,DL2,DL1,A(1),DU1,DU2,RS,C(1),IFLAG)
+      IF (IFLAG .NE. 1) THEN
+        IF (IFLAG .EQ. 0) THEN
+          IERR = 1
+        ELSE
+          IERR = -1
+        ENDIF
+        RETURN
+      ENDIF
+      IERR = 0
+C
+C-----Computing the remaining spline coefficients
+C
+      C(0) = C(1) - C(0)*H(0)
+      C(N) = C(N-1) + C(N)*H(N-1)
+C
+      A(0) = FN(0) + B(0)/3.0D0*H1(0)*(C(0)-C(1))
+      DO 70 I=1,N-1,1
+        A(I) = FN(I) - B(I)/3.0D0*(C(I-1)*H1(I-1) - D(I-1)*C(I) +
+     +         C(I+1)*H1(I))
+   70 CONTINUE
+      A(N) = FN(N) - B(N)/3.0D0*H1(N-1)*(C(N-1)-C(N))
+C
+      DO 80 I=0,N-1,1
+        B(I) = H1(I)*(A(I+1)-A(I)) -
+     +         H(I)/3.0D0*(C(I+1)+2.0D0*C(I))
+        D(I) = H1(I)/3.0D0*(C(I+1)-C(I))
+   80 CONTINUE
+      RETURN
+      END

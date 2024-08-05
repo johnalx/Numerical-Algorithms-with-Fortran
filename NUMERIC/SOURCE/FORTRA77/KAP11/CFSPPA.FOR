@@ -1,0 +1,286 @@
+C[BA*)
+C[LE*)
+C[LE*)
+C[LE*)
+C[FE{F 11.4}
+C[  {Parametric Cubic Fitting Splines}
+C[  {Parametric Cubic Fitting Splines}*)
+C[LE*)
+      SUBROUTINE CFSPPA (N,XN,FN,WX,WY,T,MT,IB,ALPHA,BETA,MW,
+C[IX{CFSPPA}*)
+     +                   AX,BX,CX,DX,AY,BY,CY,DY,AUXF,IERR)
+C
+C*****************************************************************
+C                                                                *
+C  CFSPPA computes the coefficients AX(I), BX(I), CX(I), DX(I),  *
+C  AY(I), BY(I), CY(I), DY(I) for I=0, 1, ..., N-1 of a          *
+C  parametric cubic fitting spline for various end point con-    *
+C  ditions. The end point conditions are prescribed via the      *
+C  parameter IB.                                                 *
+C[BE*)
+C  The parametric spline S with parameters T(I) for I=0, 1, ..., *
+C  N, has two component functions SX and SY of the following form*
+C                                                                *
+C  SX := SX(T) = AX(I) + BX(I)(T-T(I)) + CX(I)(T-T(I))**2 +      *
+C                                      + DX(I)(T-T(I))**3        *
+C                                                                *
+C  SY := SY(T) = AY(I) + BY(I)(T-T(I)) + CY(I)(T-T(I))**2 +      *
+C                                      + DY(I)(T-T(I))**3        *
+C                                                                *
+C  for T in the interval [T(I),T(I+1)], I=0, 1, ..., N-1.        *
+C                                                                *
+C  SX and SY are nonparametric cubic splines.                    *
+C                                                                *
+C                                                                *
+C  ASSUMPTIONS:    1.         N > 4     , for IB = 1, 2 or 3     *
+C  ============               N > 5     , for IB =  4            *
+C                  2.      T(I) < T(I+1), I=0, 1, ..., N-1       *
+C                  3.     WX(I) > 0.0   ] I=0, 1, ..., N         *
+C                  3.     WY(I) > 0.0   ]                        *
+C                  4.     WX(0) = WX(N) ] for IB = 4             *
+C                         WY(0) = WY(N) ]                        *
+C                  5.     FN(0) = FN(N) , for IB = 4             *
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  N  :  Index of the last node                                  *
+C  XN :  vector XN(0:N); XN(I) is the Ith node, I = 0, ..., N    *
+C  FN :  vector FN(0:N); FN(I) is the data at the node XN(I)     *
+C  WX :  vector WX(0:N); weight for the node XN(I), I=0, ..., N  *
+C  WY :  vector WXY0:N); weight for the data point FN(I),        *
+C        I = 0, 1, ..., N                                        *
+C  T  :  vector T(0:N); the parameter value corresponding to     *
+C        XN(I),FN(I)                                             *
+C  MT :  label for the assignment of the parameter T(I)          *
+C        MT = 0 : The user will prescribe the parameter values   *
+C                 T(I) for I=0, 1, ..., N.                       *
+C        MT = 1 : The parameter values shall be computed in sub- *
+C                 routine PSPPV from the chordal lengths.        *
+C        MT = 2 : The parameter values shall be computed in sub- *
+C                 routine PSPPV from the arc length.             *
+C                                                                *
+C  IB : determines the end point condition:                      *
+C       IB = 1: first end point derivative with respect to the   *
+C               parameter prescribed                             *
+C       IB = 2: second end point derivative with respect to the  *
+C               parameter prescribed                             *
+C       IB = 3: first end point derivative DY/DX prescribed      *
+C       IB = 4: periodic spline                                  *
+C                                                                *
+C  ALPHA :  vector ALPHA(1:2)                                    *
+C  BETA  :  vector BETA(1:2)                                     *
+C           for IB = 1 or 2 : first or second derivative wrt     *
+C                             parameter:                         *
+C                             ALPHA(1)=SX(IB)(T(0))              *
+C                             ALPHA(2)=SY(IB)(T(0))              *
+C                             BETA(1) =SX(IB)(T(N))              *
+C                             BETA(2) =SY(IB)(T(N))              *
+C           for IB = 3 :  first end point derivative DY/DX       *
+C                           ALPHA(1) = DY/DX (XN(0))             *
+C                           BETA(1)  = DY/DX (XN(N))             *
+C                           ALPHA(2) : not needed                *
+C                           BETA(2)  : not needed                *
+C                If the magnitude of ALPHA(1) or BETA(1) exceeds *
+C                1.E10, then the corresponding tangent vector is *
+C                computed as follows:                            *
+C                 . .                                            *
+C                (X,Y) = (0,SIGN(1,FN(1)-FN(0))  (left end point)*
+C                 . .                                            *
+C                (X,Y) = (0,SIGN(1,FN(N)-FN(N-1)) (right end     *
+C                                                        point)  *
+C                                                                *
+C           for IB = 4 : not needed                              *
+C                                                                *
+C  (A natural parametric fitting spline can be obtained for IB=2 *
+C   and ALPHA(1) = ALPHA(2) = BETA(1) = BETA(2) = 0.0.)          *
+C                                                                *
+C  MW : label for preassignment of weights WX(I),WY(I), I=0,...,N*
+C       MW < 1: weights not preassigned,                         *
+C               CFSPPA uses  WX(I) = WY(I) = 1.0                 *
+C       MW = 1: the user preassigns the weights WY(I),           *
+C               CFSPPA uses WX(I) = WY(I)                        *
+C       MW > 1: the user preassigns both WX(I) and WY(I)         *
+C                                                                *
+C                                                                *
+C  AUXILIARY VARIABLES:                                          *
+C  ====================                                          *
+C  AUXF :  vector AUXF(1:14*N-10)                                *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  ==================                                            *
+C  AX :  vector  AX(0:N) ]   The elements in positions 0 to N-1  *
+C  BX :  vector  BX(0:N) ]   are the coefficients of the com-    *
+C  CX :  vector  CX(0:N) ]   component spline function SX        *
+C  DX :  vector  DX(0:N) ]                                       *
+C                                                                *
+C  AY :  vector  AY(0:N) ]   The elements in positions 0 to N-1  *
+C  BY :  vector  BY(0:N) ]   are the coefficients of the com-    *
+C  CY :  vector  CY(0:N) ]   component spline function SY        *
+C  DY :  vector  DY(0:N) ]                                       *
+C                            The elements in position N are      *
+C                            auxiliary variables                 *
+C  IERR :  error parameter                                       *
+C          =  0 :  All is o.k                                    *
+C          = -1 :  N < 5  (for IB = 1, 2, 3)                     *
+C                  N < 6  (for IB =  4 )                         *
+C          = -2 :  IB < 1  or  IB > 4                            *
+C          = -3 :  Inadmissable weight WX or WY                  *
+C          = -4 :  parameter values T(I) not ordered monotonical-*
+C                  ly, i.e., T(I) >= T(I+1) for some I=0,..., N-1*
+C          = -5 :  IB = 4 and FN(0) not equal to FN(N) or        *
+C                  WX(0) not equal to WX(N) or                   *
+C                  WY(0) not equal to WY(N)                      *
+C          =  1 :  error in FDISY or NCYFSY (system matrix       *
+C                  numerically singular)                         *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: CFSP1D, CFSP2D, CFSPPE, PSPPV           *
+C                                                                *
+C                                                                *
+C  Reference : Engeln-MÅllges, G.; Reutter, F., [ENGE87].        *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author   : GÅnter Palm                                        *
+C  Date     : 04.18.1988                                         *
+C  Source   : FORTRAN 77                                         *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DOUBLE PRECISION XN(0:N), FN(0:N), WX(0:N), WY(0:N), T(0:N),
+     +                 AX(0:N), BX(0:N), CX(0:N), DX(0:N),
+     +                 AY(0:N), BY(0:N), CY(0:N), DY(0:N),
+     +                 ALPHA(2), BETA(2), AUXF(1:14*N-10)
+C
+C-----Check assumptions
+C
+      IERR = -1
+      IF (N .LT. 5) RETURN
+      IF (IB .LT. 1  .OR.  IB .GT. 4) THEN
+        IERR = -2
+        RETURN
+      ENDIF
+      IERR = -3
+C
+C-----Check or compute the weights
+C
+      IF (MW .GT. 1) THEN
+C
+C       Check the prescribed weights
+C
+        DO 10 I=0,N,1
+          IF (WX(I) .LE. 0.0D0  .OR.  WY(I) .LE. 0.0D0) RETURN
+   10   CONTINUE
+        MREP = 1
+      ELSE
+        IF (MW .EQ. 1) THEN
+C
+C         Check the prescribed weights WY
+C
+          DO 20 I=0,N,1
+            IF (WY(I) .LE. 0.0D0) RETURN
+   20     CONTINUE
+        ELSE
+C
+C         If not prescribed, assign 1.0 to all weights WY
+C
+          DO 30 I=0,N,1
+            WY(I) = 1.0D0
+   30     CONTINUE
+        ENDIF
+C
+C       Set the weights  WX equal to the weights WY
+C
+        DO 40 I=0,N,1
+          WX(I) = WY(I)
+   40   CONTINUE
+        MREP = 2
+      ENDIF
+C
+C-----Compute and/or check the parameter values
+C
+      IF (MT .GT. 0) THEN
+C
+C       Compute the parameter values in subroutine PSPPV
+C
+        CALL PSPPV (N,XN,FN,T,MT,IERR)
+        IF (IERR .NE. 0) THEN
+          IERR = -4
+          RETURN
+        ENDIF
+      ELSE
+C
+C       Check the prescribed parameter values
+C
+        IERR = -4
+        DO 50 I=0,N-1,1
+          IF (T(I+1) .LE. T(I)) RETURN
+   50   CONTINUE
+      ENDIF
+C
+C-----Compute the spline coefficients
+C
+      IF (IB .EQ. 1) THEN
+        CALL CFSP1D (N,T,XN,WX,ALPHA(1),BETA(1),1,AX,BX,CX,DX,
+     +               AUXF(1),AUXF(N+1),AUXF(2*N+1),AUXF(3*N+1),
+     +               AUXF(4*N),AUXF(5*N-1),AUXF(6*N-2),IERR)
+        IF (IERR .NE. 0) RETURN
+        CALL CFSP1D (N,T,FN,WY,ALPHA(2),BETA(2),MREP,AY,BY,CY,DY,
+     +               AUXF(1),AUXF(N+1),AUXF(2*N+1),AUXF(3*N+1),
+     +               AUXF(4*N),AUXF(5*N-1),AUXF(6*N-2),IERR)
+      ELSEIF (IB .EQ. 2) THEN
+        CALL CFSP2D (N,T,XN,WX,ALPHA(1),BETA(1),1,AX,BX,CX,DX,
+     +               AUXF(1),AUXF(N+1),AUXF(2*N+1),AUXF(3*N+1),
+     +               AUXF(4*N),AUXF(5*N-1),AUXF(6*N-2),IERR)
+        IF (IERR .NE. 0) RETURN
+        CALL CFSP2D (N,T,FN,WY,ALPHA(2),BETA(2),MREP,AY,BY,CY,DY,
+     +               AUXF(1),AUXF(N+1),AUXF(2*N+1),AUXF(3*N+1),
+     +               AUXF(4*N),AUXF(5*N-1),AUXF(6*N-2),IERR)
+      ELSEIF (IB .EQ. 3) THEN
+C
+C       Compute the tangent vectors of the first derivatives
+C       for SX and SY
+C
+        UB = 1.0D10
+        IF (DABS(ALPHA(1)) .GE. UB) THEN
+          ALPHAX = 0.0D0
+          ALPHAY = DSIGN(1.0D0,FN(1)-FN(0))
+        ELSE
+          ROOT   = DSQRT(1.0D0/(1.0D0 + ALPHA(1)*ALPHA(1)))
+          ALPHAX = DSIGN(ROOT,XN(1)-XN(0))
+          ALPHAY = ALPHAX*ALPHA(1)
+        ENDIF
+        IF (DABS(BETA(1)) .GE. UB) THEN
+          BETAX = 0.0D0
+          BETAY = DSIGN(1.0D0,FN(N)-FN(N-1))
+        ELSE
+          ROOT  = DSQRT(1.0D0/(1.0D0 + BETA(1)*BETA(1)))
+          BETAX = DSIGN(ROOT,XN(N)-XN(N-1))
+          BETAY = BETAX*BETA(1)
+        ENDIF
+        CALL CFSP1D (N,T,XN,WX,ALPHAX,BETAX,1,AX,BX,CX,DX,
+     +               AUXF(1),AUXF(N+1),AUXF(2*N+1),AUXF(3*N+1),
+     +               AUXF(4*N),AUXF(5*N-1),AUXF(6*N-2),IERR)
+        IF (IERR .NE. 0) RETURN
+        CALL CFSP1D (N,T,FN,WY,ALPHAY,BETAY,MREP,AY,BY,CY,DY,
+     +               AUXF(1),AUXF(N+1),AUXF(2*N+1),AUXF(3*N+1),
+     +               AUXF(4*N),AUXF(5*N-1),AUXF(6*N-2),IERR)
+      ELSE
+        IERR = -1
+        IF (N .LT. 6) RETURN
+        CALL CFSPPE (N,T,XN,WX,1,AX,BX,CX,DX,AUXF(1),AUXF(N+2),
+     +               AUXF(2*N+3),AUXF(3*N+4),AUXF(4*N+5),
+     +               AUXF(5*N+5),IERR)
+        IF (IERR .NE. 0) RETURN
+        CALL CFSPPE (N,T,FN,WY,MREP,AY,BY,CY,DY,AUXF(1),AUXF(N+2),
+     +               AUXF(2*N+3),AUXF(3*N+4),AUXF(4*N+5),
+     +               AUXF(5*N+5),IERR)
+      ENDIF
+      RETURN
+      END

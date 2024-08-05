@@ -1,0 +1,588 @@
+<html>
+<head>
+<title>fortra77/kap12/bezier.for</title>
+</head>
+<body>
+<a name="anfang"</a>
+<hr>
+<a href="#ende">End of file</a><br>
+<a href="../../inhalt.htm#fortra77kap12bezierfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+<font size=+2>
+<pre>
+
+
+
+</pre><u><h1>F 12.3.3  B&eacute;zier Spline Surfaces</h1></u><pre>
+
+<a name="BEZIER9"</a>      SUBROUTINE BEZIER (B,D,WORK,ITYP,M,N,EPS)
+C
+C*****************************************************************
+C                                                                *
+C     This subroutine performs                                   *
+C     for ITYP = 0   the bicubic BEZIER-method. Here we determine*
+C                    interpolation points from the input data for*
+C                    a spline surface that is constructed using  *
+C                    the bicubic BEZIER-method;                  *
+C     for ITYP = 1   the modified bicubic BEZIER-method. In it   *
+C                    the input interpolation points are regarded *
+C                    as weight points at first, for which pseudo-*
+C                    interpolation points are determined. These  *
+C                    are shifted until they coincide with the    *
+C                    true interpolation points, except for an    *
+C                    accuracy EPS.                               *
+C                                                                *
+C                                                                *
+C     INPUT PARAMETERS:                                          *
+C     =================                                          *
+C     ITYP          INTEGER   which defines the method used:     *
+C                               ITYP=0 : BEZIER-method           *
+C                               ITYP=1 : modified BEZIER-method  *
+C     M             INTEGER   number of patches in 1st direction *
+C     N             INTEGER   number of patches in 2nd direction *
+C                                                                *
+C     ---   for ITYP = 0  ---                                    *
+C     D(3,0:M,0:N)     Double Precision coordinates of the weight*
+C                      points                                    *
+C                                                                *
+C     ---  for ITYP = 1  ---                                     *
+C     EPS              Double Precision accuracy bound for the   *
+C                             interpolation                      *
+C     D(3,0:M,0:N)     Double Precision coordinates of the inter-*
+C                             polation points                    *
+C                                                                *
+C                                                                *
+C     OUTPUT PARAMETERS:                                         *
+C     ==================                                         *
+C     B(3,0:3M,0:3N)   Double Precision coordinates of the BEZIER*
+C                      points  B(3,J,I) for J=0, 1, ..., 3M and  *
+C                      I=0, 1, ..., 3N                           *
+C                                                                *
+C                                                                *
+C     AUXILIARY PARAMETERS:                                      *
+C     =====================                                      *
+C     WORK(3,0:M,0:N)  Double Precision storage for coordinates  *
+C                      of intermediate BEZIER points.            *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: INTPOL, BEZPNT, BEZBRD                  *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author   : Michael Radermacher                                *
+C  editor   : Hartmut Turowski                                   *
+C  date     : 05.24.1990                                         *
+C  source   : FORTRAN 77                                         *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DOUBLE PRECISION B(3,0:3*M,0:3*N),D(3,0:M,0:N),WORK(3,0:M,0:N)
+      DOUBLE PRECISION DIFF(3)
+C
+C*****************************************************************
+C     for the bicubic BEZIER-method:                             *
+C     call SUBROUTINE BEZPNT to determine the BEZIER points      *
+C*****************************************************************
+C
+      IF (ITYP .EQ. 0) THEN
+         CALL BEZPNT (B,D,M,N)
+         RETURN
+      ENDIF
+C
+C*****************************************************************
+C     for the modified bicubic BEZIER-method:                    *
+C     save the contents of D in work-space WORK                  *
+C*****************************************************************
+C
+      DO 20 I=0,N
+         DO 20 J=0,M
+            DO 20 L=1,3
+   20           WORK(L,J,I)=D(L,J,I)
+C
+C*****************************************************************
+C     call SUBROUTINE BEZPNT for first determination of          *
+C     the BEZIER points using the bicubic BEZIER-method          *
+C*****************************************************************
+C
+      CALL BEZPNT (B,D,M,N)
+C
+C*****************************************************************
+C     transformation of the coordinates of the just determined   *
+C     BEZIER points to the original interpolation points         *
+C*****************************************************************
+C
+   40 DO 60 J=0,M
+         DO 60 I=0,N
+            DO 50 L=1,3
+   50          DIFF(L)=WORK(L,J,I)-B(L,3*J,3*I)
+   60 CALL INTPOL (DIFF,3*J,3*I,B,M,N)
+C
+C*****************************************************************
+C     test whether the modified interpolation points approximate *
+C     the original interpolation points within EPS               *
+C*****************************************************************
+C
+      DO 70 J=0,M
+         DO 70 I=0,N
+            DO 70 L=1,3
+   70          IF (ABS(B(L,3*J,3*I)-WORK(L,J,I)) .GT. EPS) GOTO 40
+      RETURN
+      END
+C
+C
+
+<a name="INTPOL132"</a>      SUBROUTINE INTPOL (DIFF,J,I,B,M,N)
+C
+C*****************************************************************
+C                                                                *
+C     This Subroutine performs the changes of the interpolation  *
+C     points stored in B for the spline surface that has been    *
+C     approximately determined by the bicubic BEZIER-method      *
+C                                                                *
+C                                                                *
+C     INPUT PARAMETERS:                                          *
+C     =================                                          *
+C     DIFF(3)         Double Precision coordinates of the        *
+C                     difference vector, according to which the  *
+C                     BEZIER surface is to be modified           *
+C     J, I            INTEGER labels for the patch, in whose     *
+C                     neighborhood the BEZIER surface is modified*
+C     M               INTEGER: number of patches in 1st direction*
+C     N               INTEGER: number of patches in 2nd direction*
+C     B(3,0:3M,0:3N)  Double Precision coordinates of the BEZIER *
+C                     points                                     *
+C                                                                *
+C                                                                *
+C     OUTPUT PARAMETERS:                                         *
+C     ==================                                         *
+C     B(3,0:3M,0:3N)  Double Precision coordinates of the BEZIER *
+C                     points                                     *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author   : Michael Radermacher                                *
+C  editor   : Hartmut Turowski                                   *
+C  date     : 05.18.1990                                         *
+C  source   : FORTRAN 77                                         *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DOUBLE PRECISION B(3,0:3*M,0:3*N),DIFF(3)
+C
+C*****************************************************************
+C     in case the BEZIER point B(L,3*J,3*I) that is to be        *
+C     modified lies on then boundary of the surface              *
+C*****************************************************************
+C
+      IF ((I .EQ. 0) .OR. (I .EQ. 3*N)) THEN
+C
+C*****************************************************************
+C     the point lies on the boundary with I=0 or I=3*N           *
+C*****************************************************************
+C
+         DO 40 L=1,3
+            IF ((J .EQ. 0) .OR. (J .EQ. 3*M)) THEN
+C
+C*****************************************************************
+C     corner point: modify by 16*D                               *
+C*****************************************************************
+C
+               B(L,J,I)=B(L,J,I)+DIFF(L)
+            ELSE
+C
+C*****************************************************************
+C     other boundary point:                                      *
+C     modify the points with J-3 and J+3 by 6*D                  *
+C*****************************************************************
+C
+               DO 10 K1=-3,3,6
+   10             B(L,J+K1,I)=B(L,J+K1,I)+3.0D0*DIFF(L)/8.0D0
+C
+C*****************************************************************
+C     modify the points with J-2 and J+2 by 12*D                 *
+C*****************************************************************
+C
+               DO 20 K1=-2,2,4
+   20             B(L,J+K1,I)=B(L,J+K1,I)+.75D0*DIFF(L)
+C
+C*****************************************************************
+C     modify the 3 interior points by 24*D                       *
+C*****************************************************************
+C
+               DO 30 K1=-1,1
+   30             B(L,J+K1,I)=B(L,J+K1,I)+1.5D0*DIFF(L)
+            ENDIF
+   40    CONTINUE
+         RETURN
+      ENDIF
+      IF ((J .EQ. 0) .OR. (J .EQ. 3*M)) THEN
+C
+C*****************************************************************
+C     the point lies on the boundary with J=0 or J=3*M           *
+C     modify analogously as for the I-margins:                   *
+C*****************************************************************
+C
+         DO 80 L=1,3
+            IF ((I .EQ. 0) .OR. (I .EQ. 3*N)) THEN
+C
+C*****************************************************************
+C     corner point                                               *
+C*****************************************************************
+C
+               B(L,J,I)=B(L,J,I)+DIFF(L)
+            ELSE
+C
+C*****************************************************************
+C     other boundary point                                       *
+C*****************************************************************
+C
+               DO 50 K2=-3,3,6
+   50             B(L,J,I+K2)=B(L,J,I+K2)+3.0D0*DIFF(L)/8.0D0
+               DO 60 K2=-2,2,4
+   60             B(L,J,I+K2)=B(L,J,I+K2)+.75D0*DIFF(L)
+               DO 70 K2=-1,1
+   70             B(L,J,I+K2)=B(L,J,I+K2)+1.5D0*DIFF(L)
+            ENDIF
+   80    CONTINUE
+         RETURN
+      ENDIF
+C
+C*****************************************************************
+C     loop over the X-, Y- and Z-coordinates                     *
+C*****************************************************************
+C
+      DO 180 L=1,3
+C
+C*****************************************************************
+C        modification of the BEZIER points B(L,3*J-1,3*I-1),     *
+C        B(L,3*J-1,3*I+1), B(L,3*J,3*I-1), B(L,3*J,3*I),         *
+C        B(L,3*J+1,3*I-1), B(L,3*J+1,3*I), B(L,3*J+1,3*I+1),     *
+C        B(L,3*J-1,3*I) and B(L,3*J,3*I+1) by 16*D               *
+C*****************************************************************
+C
+         DO 90 K1=-1,1
+            DO 90 K2=-1,1
+   90          B(L,J+K1,I+K2)=B(L,J+K1,I+K2)+DIFF(L)
+C
+C*****************************************************************
+C      modification of the BEZIER points B(L,3*J-2,3*I-1),       *
+C      B(L,3*J-2,3*I), B(L,3*J-2,3*I+1), B(L,3*J+2,3*I-1),       *
+C      B(L,3*J+2,3*I) and B(L,3*J+2,3*I+1) by 8*D                *
+C*****************************************************************
+C
+         DO 100 K1=-2,2,4
+            DO 100 K2=-1,1
+  100          B(L,J+K1,I+K2)=B(L,J+K1,I+K2)+DIFF(L)/2.0D0
+C
+C*****************************************************************
+C      modification of the BEZIER points B(L,3*J-1,3*I-2),       *
+C      B(L,3*J,3*I-2), B(L,3*J+1,3*I-2), B(L,3*J-1,3*I+2),       *
+C      B(L,3*J,3*I+2), and B(L,3*J+1,3*I+2) by 8*D               *
+C*****************************************************************
+C
+         DO 110 K1=-1,1
+            DO 110 K2=-2,2,4
+  110          B(L,J+K1,I+K2)=B(L,J+K1,I+K2)+DIFF(L)/2.0D0
+C
+C*****************************************************************
+C     modification of the BEZIER points B(L,3*J-3,3*I-1),        *
+C     B(L,3*J-3,3*I), B(L,3*J-3,3*I+1), B(L,3*J+3,3*I-1),        *
+C     B(L,3*J+3,3*I) and B(L,3*J+3,3*I+1) by 4*D                 *
+C*****************************************************************
+C
+         DO 120 K1=-3,3,6
+            DO 120 K2=-1,1
+  120          B(L,J+K1,I+K2)=B(L,J+K1,I+K2)+DIFF(L)/4.0D0
+C
+C*****************************************************************
+C   modification of the BEZIER points B(L,3*J-2,3*I-2),          *
+C   B(L,3*J-2,3*I+2), B(L,3*J+2,3*I-2) and B(L,3*J+2,3*I+2)      *
+C   by 4*D                                                       *
+C*****************************************************************
+C
+         DO 130 K1=-2,2,4
+            DO 130 K2=-2,2,4
+  130          B(L,J+K1,I+K2)=B(L,J+K1,I+K2)+DIFF(L)/4.0D0
+C
+C*****************************************************************
+C   modification of the BEZIER points B(L,3*J-1,3*I-3),          *
+C   B(L,3*J-1,3*I+3), B(L,3*J,3*I-3), B(L,3*J,3*I+3),            *
+C   B(L,3*J+1,3*I-3) and B(L,3*J+1,3*I+3) by 4*D                 *
+C*****************************************************************
+C
+         DO 140 K1=-1,1
+            DO 140 K2=-3,3,6
+  140          B(L,J+K1,I+K2)=B(L,J+K1,I+K2)+DIFF(L)/4.0D0
+C
+C*****************************************************************
+C   modification of the BEZIER points B(L,3*J-3,3*I-2),          *
+C   B(L,3*J-3,3*I+2), B(L,3*J+3,3*I-2) and B(L,3*J+3,3*I+2)      *
+C   by 2*D                                                       *
+C*****************************************************************
+C
+         DO 150 K1=-3,3,6
+            DO 150 K2=-2,2,4
+  150          B(L,J+K1,I+K2)=B(L,J+K1,I+K2)+DIFF(L)/8.0D0
+C
+C*****************************************************************
+C   modification of the BEZIER points B(L,3*J-2,3*I-3),          *
+C   B(L,3*J-2,3*I+3), B(L,3*J+2,3*I-3) and B(L,3*J+2,3*I+30      *
+C   by 2*D                                                       *
+C*****************************************************************
+C
+         DO 160 K1=-2,2,4
+            DO 160 K2=-3,3,6
+  160          B(L,J+K1,I+K2)=B(L,J+K1,I+K2)+DIFF(L)/8.0D0
+C
+C*****************************************************************
+C   modification of the BEZIER points B(L,3*J-3,3*I-3),          *
+C   B(L,3*J-3,3*I+3), B(L,3*J+3,3*I-3) and B(L,3*J+3,3*I+3) by D *
+C*****************************************************************
+C
+          DO 170 K1=-3,3,6
+             DO 170 K2=-3,3,6
+  170           B(L,J+K1,I+K2)=B(L,J+K1,I+K2)+DIFF(L)/16.0D0
+  180     CONTINUE
+      RETURN
+      END
+C
+C
+
+<a name="BEZPNT357"</a>      SUBROUTINE BEZPNT (B,D,M,N)
+C
+C*****************************************************************
+C                                                                *
+C     This Subroutine computes the BEZIER points, that are       *
+C     needed for determining the surface when using the bicubic  *
+C     BEZIER-method.                                             *
+C     The coordinates of the BEZIER points are stored in B;      *
+C     the corresponding weight points are to be found in D.      *
+C                                                                *
+C                                                                *
+C     INPUT PARAMETERS:                                          *
+C     =================                                          *
+C     M             INTEGER   number of patches in 1st direction *
+C     N             INTEGER   number of patches in 2nd direction *
+C     D(3,0:M,0:N)  Double Precision coordinates of the weight   *
+C                   points                                       *
+C                                                                *
+C                                                                *
+C     OUTPUT PARAMETERS:                                         *
+C     ==================                                         *
+C     B(3,0:3M,0:3N) Double Precision coordinates of all BEZIER  *
+C                    points                                      *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: BEZBRD                                  *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author   : Michael Radermacher                                *
+C  editor   : Hartmut Turowski                                   *
+C  date     : 05.18.1990                                         *
+C  source   : FORTRAN 77                                         *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DOUBLE PRECISION B(3,0:3*M,0:3*N),D(3,0:M,0:N)
+C
+C*****************************************************************
+C     determine boundary points by the 1-dimensional             *
+C     BEZIER-method                                              *
+C*****************************************************************
+C
+      CALL BEZBRD (B,D,M,N)
+C
+C*****************************************************************
+C     loop over the X-, Y- and Z-coordinates                     *
+C*****************************************************************
+C
+      DO 100 K=1,3
+C
+C*****************************************************************
+C        determine the BEZIER points B(K,3*J-2,3*I-2);           *
+C        J=1, ..., M, I=1, ..., N, K=1,2,3                       *
+C*****************************************************************
+C
+         DO 10 J=1,M
+            DO 10 I=1,N
+   10          B(K,3*J-2,3*I-2)=(4.0D0*D(K,J-1,I-1)+2.0D0*D(K,J-1,I)
+     F                          +2.0D0*D(K,J,I-1)+D(K,J,I))/9.0D0
+C
+C*****************************************************************
+C        determine the BEZIER points B(K,3*J+2,3*I-2);           *
+C        J=0, 1, ..., M-1, I=1, ..., N, K=1,2,3                  *
+C*****************************************************************
+C
+         DO 20 J=0,M-1
+            DO 20 I=1,N
+   20          B(K,3*J+2,3*I-2)=(4.0D0*D(K,J+1,I-1)+2.0D0*D(K,J,I-1)
+     F                          +2.0D0*D(K,J+1,I)+D(K,J,I))/9.0D0
+C
+C*****************************************************************
+C        determine the BEZIER points B(K,3*J-2,3*I+2);           *
+C        J=1, ..., M, I=0, ..., N-1, K=1,2,3                     *
+C*****************************************************************
+C
+         DO 30 J=1,M
+            DO 30 I=0,N-1
+   30          B(K,3*J-2,3*I+2)=(4.0D0*D(K,J-1,I+1)+2.0D0*D(K,J-1,I)
+     F                          +2.0D0*D(K,J,I+1)+D(K,J,I))/9.0D0
+C
+C*****************************************************************
+C        determine the BEZIER points B(K,3*J+2,3*I+2);           *
+C        J=0, 1, ..., M-1, I=0, 1, ..., N-1, K=1,2,3             *
+C*****************************************************************
+C
+         DO 40 J=0,M-1
+            DO 40 I=0,N-1
+   40          B(K,3*J+2,3*I+2)=(4.0D0*D(K,J+1,I+1)+2.0D0*D(K,J,I+1)
+     F                          +2.0D0*D(K,J+1,I)+D(K,J,I))/9.0D0
+C
+C*****************************************************************
+C        determine the BEZIER points B(K,3*J-2,3*I);             *
+C        J=1, ..., N-1, I=1, ..., M, K=1,2,3                     *
+C*****************************************************************
+C
+         DO 50 J=1,M
+            DO 50 I=1,N-1
+   50          B(K,3*J-2,3*I)=(2.0D0*D(K,J-1,I-1)+8.0D0*D(K,J-1,I)
+     F                              +D(K,J,I-1)+2.0D0*D(K,J-1,I+1)
+     F                        +4.0D0*D(K,J,I)+D(K,J,I+1))/18.0D0
+C
+C*****************************************************************
+C        determine the BEZIER points B(K,3*J,3*I-2);             *
+C        J=1, ..., M-1, I=1, ..., N, K=1,2,3                     *
+C*****************************************************************
+C
+         DO 60 J=1,M-1
+            DO 60 I=1,N
+   60          B(K,3*J,3*I-2)=(2.0D0*D(K,J-1,I-1)+8.0D0*D(K,J,I-1)
+     F                              +D(K,J-1,I)+2.0D0*D(K,J+1,I-1)
+     F                        +4.0D0*D(K,J,I)+D(K,J+1,I))/18.0D0
+C
+C*****************************************************************
+C        determine the BEZIER points B(K,3*J,3*I+2);             *
+C        J=1, ..., M-1, I=0, 1, ..., N-1, K=1,2,3                *
+C*****************************************************************
+C
+         DO 70 J=1,M-1
+            DO 70 I=0,N-1
+   70          B(K,3*J,3*I+2)=(2.0D0*D(K,J-1,I+1)+8.0D0*D(K,J,I+1)
+     F                              +D(K,J-1,I)+2.0D0*D(K,J+1,I+1)
+     F                        +4.0D0*D(K,J,I)+D(K,J+1,I))/18.0D0
+C
+C*****************************************************************
+C        determine the BEZIER points B(K,3*J+2,3*I);             *
+C        J=0, 1, ..., M-1, I=1, ..., N-1, K=1,2,3                *
+C*****************************************************************
+C
+        DO 80 J=0,M-1
+           DO 80 I=1,N-1
+   80         B(K,3*J+2,3*I)=(2.0D0*D(K,J+1,I-1)+8.0D0*D(K,J+1,I)
+     F                             +D(K,J,I-1)+2.0D0*D(K,J+1,I+1)
+     F                       +4.0D0*D(K,J,I)+D(K,J,I+1))/18.0D0
+C
+C*****************************************************************
+C        determine the BEZIER points B(K,3*J,3*I);               *
+C        J=1, ..., M-1, I=1, ..., N-1, K=1,2,3                   *
+C*****************************************************************
+C
+         DO 90 J=1,M-1
+            DO 90 I=1,N-1
+   90          B(K,3*J,3*I)=(D(K,J-1,I-1)
+     F                      +4.0D0*D(K,J,I-1)+D(K,J+1,I-1)
+     F                      +4.0D0*D(K,J-1,I)+16.0D0*D(K,J,I)
+     F                      +4.0D0*D(K,J+1,I)+D(K,J-1,I+1)
+     F                      +4.0D0*D(K,J,I+1)+D(K,J+1,I+1))/36.0D0
+  100 CONTINUE
+      RETURN
+      END
+C
+C
+
+<a name="BEZBRD517"</a>      SUBROUTINE BEZBRD (B,D,M,N)
+C*****************************************************************
+C                                                                *
+C     Auxiliary program for SUBROUTINE BEZIER.                   *
+C     The boundary BEZIER points are determined from the prede-  *
+C     termined boundary weight points using 1-dimensional BEZIER *
+C     splines.                                                   *
+C                                                                *
+C                                                                *
+C     INPUT PARAMETERS:                                          *
+C     =================                                          *
+C     M             INTEGER   number of patches in 1st direction *
+C     N             INTEGER   number ov patches in 2nd direction *
+C                                                                *
+C     D(3,0:M,0:N)  Double Precision coordinates of the          *
+C                   interpolation points                         *
+C                                                                *
+C                                                                *
+C     OUTPUT PARAMETERS:                                         *
+C     ==================                                         *
+C     B(3,0:3M,0:3N) Double Precision coordinates of the         *
+C                    boundary BEZIER points                      *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author   : Hartmut Turowski                                   *
+C  date     : 05.18.1990                                         *
+C  source   : FORTRAN 77                                         *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DOUBLE PRECISION B(3,0:3*M,0:3*N),D(3,0:M,0:N)
+      DO 50 K=1,3
+         DO 20 I=0,N,N
+            DO 10 J=1,M-1
+               B(K,3*J-2,3*I)=(2.0D0*D(K,J-1,I)+D(K,J,I))/3.0D0
+               B(K,3*J,3*I)  =(D(K,J-1,I)+4.0D0*D(K,J,I)
+     F                                         +D(K,J+1,I))/6.0D0
+               B(K,3*J+2,3*I)=(D(K,J,I)+2.0D0*D(K,J+1,I))/3.0D0
+10          CONTINUE
+            B(K,2,3*I)    =(D(K,0,I)+2.0D0*D(K,1,I))/3.0D0
+            B(K,3*M-2,3*I)=(2.0D0*D(K,M-1,I)+D(K,M,I))/3.0D0
+20       CONTINUE
+         DO 40 J=0,M,M
+            DO 30 I=1,N-1
+               B(K,3*J,3*I-2)=(2.0D0*D(K,J,I-1)+D(K,J,I))/3.0D0
+               B(K,3*J,3*I)  =(D(K,J,I-1)+4.0D0*D(K,J,I)
+     F                                         +D(K,J,I+1))/6.0D0
+               B(K,3*J,3*I+2)=(D(K,J,I)+2.0D0*D(K,J,I+1))/3.0D0
+30          CONTINUE
+            B(K,3*J,2)    =(D(K,J,0)+2.0D0*D(K,J,1))/3.0D0
+            B(K,3*J,3*N-2)=(2.0D0*D(K,J,N-1)+D(K,J,N))/3.0D0
+40       CONTINUE
+         B(K,0,0)    =D(K,0,0)
+         B(K,3*M,0)  =D(K,M,0)
+         B(K,0,3*N)  =D(K,0,N)
+         B(K,3*M,3*N)=D(K,M,N)
+50    CONTINUE
+      RETURN
+      END
+</font>
+</pre>
+<a name="ende"</a>
+<hr>
+<a href="#anfang">Begin of file</a><br>
+<a href="../../inhalt.htm#fortra77kap12bezierfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+</body>
+</html>

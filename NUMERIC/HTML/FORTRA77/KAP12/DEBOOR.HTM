@@ -1,0 +1,123 @@
+<html>
+<head>
+<title>fortra77/kap12/deboor.for</title>
+</head>
+<body>
+<a name="anfang"</a>
+<hr>
+<a href="#ende">End of file</a><br>
+<a href="../../inhalt.htm#fortra77kap12deboorfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+<font size=+2>
+<pre>
+
+<a name="DEBOOR3"</a>      SUBROUTINE DEBOOR (N,M,DP,K,KV,T,IR,D,E,X,IERR)
+C
+C*****************************************************************
+C                                                                *
+C  This program computes the point corresponding to the parameter*
+C  T of a uniform b spline whose nodes are known by using the    *
+C  algorithm of DE BOOR.                                         *
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  N      : N+1 is the number of DE BOOR points, N >= 2          * 
+C  M      : Dimension of the space for the DE BOOR points; M >= 2*
+C  DP     : DOUBLE PRECISION array DP(0:N,1:M) with the coordi-  *
+C           nates of the DE BOOR points                          *
+C  K      : Order of the B spline, 3 &lt;= K &lt;= N+1                 *
+C  KV     : INTEGER vectorKV(1:N+1+K), with the node vector of   *
+C           order K                                              *
+C  T      : Parameter value for which we want to determine a     *
+C           point on the B spline                                *
+C  IR     : Index of the element of the node vector with         *
+C              KV(IR) &lt;= T &lt;= KV(IR+1); IR >= K-1                *
+C                                                                *
+C                                                                *
+C  AUX VECTORS:                                                  *
+C  ============                                                  *
+C  D,E    : DOUBLE PRECISION arrays ..(1:K,1:M)                  *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  ==================                                            *
+C  X      : DOUBLE PRECISION vector X(1:M), with the coordinates *
+C           of the computed point on the B spline                *
+C  IERR   : Error parameter                                      *
+C           IERR=0, all ok                                       *
+C           IERR=1, error: N &lt; 2 or K &lt; 3 or K > N+1             *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  Required subroutines: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author      : Gisela Engeln-Muellges                          *
+C  Date        : 11.30.91                                        *
+C  Source code : FORTRAN 77                                      *
+C                                                                *
+C*****************************************************************
+C
+      DOUBLE PRECISION DP(0:N,1:M),D(1:K,1:M),E(1:K,1:M),X(1:M),T,ZA
+      INTEGER KV(1:N+K-1)
+C
+      IERR=0
+C
+C     Check input:g: N >= 2, 3 &lt;= K &lt;= N+1
+C
+      IF (N .LT. 2 .OR. K .LT. 3 .OR. K .GT. N+1) THEN
+         IERR=1
+         RETURN
+      ENDIF
+C
+C     Choose a set of K consecutive points from DP
+C     Use the DE BOOR algorithm; store in D
+C
+      DO 10 I=IR-K+1,IR
+         DO 20 J=1,M
+            D(I-IR+K,J)=DP(I,J)
+  20     CONTINUE
+  10  CONTINUE
+C
+C     Compute entries of E
+C
+      DO 30 L=1,K-1
+         DO 40 J=L+1,K
+            ZA=T-DBLE(KV(J+IR-K))
+            NE=KV(J+IR-L)-KV(J+IR-K)
+            IF (NE .EQ. 0) THEN
+               ALPHA=0.0D0
+            ELSE
+               ALPHA=ZA/DBLE(NE)
+            ENDIF
+            DO 50 I=1,M
+               E(J,I)=D(J-1,I)+ALPHA*(D(J,I)-D(J-1,I))
+  50        CONTINUE
+  40     CONTINUE
+         DO 60 I=1,K
+            DO 70 J=1,M
+               D(I,J)=E(I,J)
+  70        CONTINUE
+  60     CONTINUE
+  30  CONTINUE
+C
+C     Store coordinates of the computed point (in aux vector D) in X
+C
+      DO 80 I=1,M
+         X(I)=D(K,I)
+  80  CONTINUE
+      RETURN
+      END
+</font>
+</pre>
+<a name="ende"</a>
+<hr>
+<a href="#anfang">Begin of file</a><br>
+<a href="../../inhalt.htm#fortra77kap12deboorfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+</body>
+</html>

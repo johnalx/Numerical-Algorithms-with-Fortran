@@ -1,0 +1,199 @@
+<html>
+<head>
+<title>fortra77/kap02/pegasu.for</title>
+</head>
+<body>
+<a name="anfang"</a>
+<hr>
+<a href="#ende">End of file</a><br>
+<a href="../../inhalt.htm#fortra77kap02pegasufor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+<font size=+2>
+<pre>
+
+
+
+</pre><u><h1>F 2.8.2  Pegasus Method</h1></u><pre>
+
+<a name="PEGASU7"</a>      SUBROUTINE PEGASU ( FCT,A,B,ABSERR,RELERR,MAXIT,XSI,X1,X2,
+     +                    NUMIT,IERR)
+C
+C*****************************************************************
+C                                                                *
+C  We assume that the given continuous function FCT(X) satisfies:*
+C          FCT(A) * FCT(B) &lt; 0.0  on the interval [A,B].         *
+C  Thus there is at least one zero of odd order in [A,B].        *
+C  The SUBROUTINE PEGASU determines one of these zeros by        *
+C  applying the Pegasus-method.                                  *
+C  The method always converges provided the following condition  *
+C  is met:                                                       *
+C               FCT(A) * FCT(B) &lt; 0.0                            *
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  FCT   : function for which a zero is to be determined.        *
+C          It is declared as                                     *
+C              DOUBLE PRECISION FUNCTION FCT(X)                  *
+C          and has to be defined as EXTERNAL within the          *
+C          calling program (or as INTRINSIC if a FORTRAN         *
+C          standard function is used).                           *
+C  A,B   : endpoints of the interval containing a zero.          *
+C  ABSERR: ) error parameters. ABSERR >= 0.0 and RELERR >= 0.0.  *
+C  RELERR: ) Their sum has to be > 0.0. The following mixed test *
+C            is used as the break-off criterion:                 *
+C                 ABS(X1-X2) &lt;= ABS(X2)*RELERR+ABSERR.           *
+C            If RELERR=0.0, this tests the absolute error,       *
+C            if ABSERR=0.0, this tests for the relative error.   *
+C            The values entered for ABSERR and RELERR are accep- *
+C            ted unchanged by the program if they both exceed    *
+C            four times the machine constant.                    *
+C            Or, if one value is zero and the other excceds      *
+C            four times the machine constan, they are accepted   *
+C            as well. If this is not the case both or one of the *
+C            values are internally set to this value.            *
+C  MAXIT : maximum number of iteration steps.                    *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  ==================                                            *
+C  ABSERR: ) error parameters actually used.                     *
+C  RELERR: )                                                     *
+C  XSI   : zero or approximate value for the zero                *
+C          of the function FCT.                                  *
+C  X1,X2 : the last two iterates, so that [X1,X2] contains a     *
+C          zero of FCT.                                          *
+C  NUMIT : number of iteration steps executed.                   *
+C  IERR  : =-2, ABSERR or RELERR is negative or both equal zero, *
+C               or MAXIT &lt; 1.                                    *
+C          =-1, the condition FCT(A)*FCT(B) &lt; 0.0 is not met.    *
+C          = 0, A or B already are a zero of FCT.                *
+C          = 1, XSI is a zero with ABS(FCT(XSI)) &lt; 4* machine    *
+C               constant.                                        *
+C          = 2, break-off criterion has been met, XSI:=X2 if     *
+C                   ABS(FCT(X2)) &lt;= ABS(FCT(X1)),                *
+C               otherwise XSI:=X1.                               *
+C               The absolute error of the computed zero is less  *
+C               than or equal to  ABS(X1-X2).                    *
+C          = 3, the maximum number of iteration steps was        *
+C               reached without meeting the break-off criterion. *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: MACHPD                                  *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author     : Gisela Engeln-Muellges                           *
+C  date       : 09.02.1985                                       *
+C  source     : FORTRAN 77                                       *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+C
+C  initializing the parameters NUMIT, X1, X2.
+C
+      NUMIT=0
+      X1=A
+      X2=B
+C
+C  calculating the machine constant FMACHP.
+C
+      FMACHP=1.0D0
+   10 FMACHP=0.5D0*FMACHP
+      IF(MACHPD(1.0D0+FMACHP) .EQ. 1) GOTO 10
+      FMACHP=2.0D0*FMACHP
+C
+C  calculating the functional values at the endpoints A and B.
+C
+      F1=FCT(X1)
+      F2=FCT(X2)
+C
+C  testing for alternate signs of FCT at A and B:  FCT(A)*FCT(B) &lt; 0.0 .
+C
+      IF(F1*F2 .GT. 0.0D0) THEN
+         IERR=-1
+         RETURN
+      ELSE IF(F1*F2 .EQ. 0.0D0) THEN
+         IERR=0
+         RETURN
+      END IF
+C
+C  testing for validity of the error bounds and MAXIT.
+C
+      IF(ABSERR .GE. 0.0D0 .AND. RELERR .GE. 0.0D0 .AND.
+     +   ABSERR+RELERR .GT. 0.0D0 .AND. MAXIT .GE. 1) GOTO 20
+         IERR=-2
+         RETURN
+   20 DUMMY=4.0D0*FMACHP
+      IF(RELERR .EQ. 0.0D0) THEN
+         IF(ABSERR .LT. DUMMY) ABSERR=DUMMY
+      ELSE IF(ABSERR .EQ. 0.0D0) THEN
+         IF(RELERR .LT. DUMMY) RELERR=DUMMY
+      ELSE
+         IF(ABSERR .LT. DUMMY) ABSERR=DUMMY
+         IF(RELERR .LT. DUMMY) RELERR=DUMMY
+      END IF
+C
+C  executing the Pegasus-method.
+C
+      DO 30 I = 1,MAXIT,1
+         NUMIT=I
+C
+C     testing whether the value of F2 is less than four times
+C     the machine constant. If this is the case, X2 is accepted
+C     as a zero of FCT with IERR=1.
+C
+         IF(DABS(F2) .LT. 4.0D0*FMACHP) THEN
+            XSI=X2
+            IERR=1
+            RETURN
+C
+C     testing for the break-off criterion.
+C
+         ELSE IF(DABS(X2-X1) .LE. DABS(X2)*RELERR+ABSERR) THEN
+            XSI=X2
+            IF(DABS(F1) .LT. DABS(F2)) XSI=X1
+            IERR=2
+            RETURN
+         ELSE
+C
+C     calculating the secant slope.
+C
+            S12=(F2-F1)/(X2-X1)
+C
+C     calculating the secant intercept X3 with the x-axis.
+C
+            X3=X2-F2/S12
+C
+C     calculating a new functional value at X3.
+C
+            F3=FCT(X3)
+C
+C     definition of the endpoints of a smaller inclusion interval.
+C
+            IF(F2*F3 .LE. 0.0D0) THEN
+               X1=X2
+               F1=F2
+            ELSE
+               F1=F1*F2/(F2+F3)
+            END IF
+            X2=X3
+            F2=F3
+         END IF
+   30 CONTINUE
+      IERR=3
+      RETURN
+      END
+</font>
+</pre>
+<a name="ende"</a>
+<hr>
+<a href="#anfang">Begin of file</a><br>
+<a href="../../inhalt.htm#fortra77kap02pegasufor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+</body>
+</html>

@@ -1,0 +1,274 @@
+C[BA*)
+C[LE*)
+C[LE*)
+C[LE*)
+C[FE{F 4.10.2}
+C[  {Systems with Trid.\ Symm.\ Strongly Nonsing.\ Matrices}
+C[  {Systems with Tridiagonal Symmetric
+C[   Strongly Nonsingular Matrices}*)
+C[LE*)
+      SUBROUTINE TRDSY (N,DM,DU,RS,X,MARK)
+C[IX{TRDSY}*)
+C
+C*****************************************************************
+C                                                                *
+C     Solving a linear system of equations                       *
+C                  A * X = RS                                    *
+C     for a tridiagonal, symmetric, positive definite matrix A.  *
+C[BE*)
+C     The matrix A is defined by the two N-vectors DM and DU.    *
+C     The system of equations is given as follows:               *
+C                                                                *
+C     DM(1) * X(1) + DU(1) * X(2)                      = RS(1)   *
+C                                                                *
+C     DU(I-1) * X(I-1) + DM(I) * X(I) + DU(I) * X(I+1) = RS(I)   *
+C            for I = 2, ... ,N-1, and                            *
+C                                                                *
+C     DU(N-1) * X(N-1) + DM(N) * X(N)                  = RS(N)   *
+C                                                                *
+C                                                                *
+C                                                                *
+C     INPUT PARAMETERS:                                          *
+C     =================                                          *
+C     N    : number of equations, N > 2                          *
+C     DM   : N-vector DM(1:N); main diagonal of A                *
+C            DM(1), DM(2), ... , DM(N)                           *
+C     DU   : N-vector DU(1:N); co-diagonal of A                  *
+C            DU(1), DU(2), ... , DU(N-1)                         *
+C     RS   : N-vector X(1:N); the right hand side                *
+C                                                                *
+C                                                                *
+C     OUTPUT PARAMETERS:                                         *
+C     ==================                                         *
+C     DM   :)                                                    *
+C     DU   :) overwritten with auxiliary vectors                 *
+C     RS   :)                                                    *
+C     X    : N-vector X(1:N) containing the solution of the      *
+C            system of equations                                 *
+C     MARK : error parameter                                     *
+C            MARK= 1 : ok                                        *
+C            MARK= 0 : numerically the matrix A is not strongly  *
+C                      nonsingular                               *
+C            MARK=-1 : A is not positive definite.               *
+C            MARK=-2 : condition N > 2 is not satisfied          *
+C                                                                *
+C     NOTE: If MARK = 1, then the determinant of A can be        *
+C           calculated as:                                       *
+C              DET A = DM(1) * DM(2) * ... * DM(N)               *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: TRDSYP, TRDSYS, MACHPD                  *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author     : Gisela Engeln-Muellges                           *
+C  date       : 25.04.1988                                       *
+C  source     : FORTRAN 77                                       *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DOUBLE PRECISION DM(1:N),DU(1:N),RS(1:N),X(1:N)
+      MARK = -2
+      IF (N .LT. 3) RETURN
+C
+C  Factoring A
+C
+      CALL TRDSYP (N,DM,DU,MARK)
+C
+C  if MARK = 1 update and backsubstitute
+C
+      IF (MARK .EQ. 1) THEN
+         CALL TRDSYS (N,DM,DU,RS,X)
+      ENDIF
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE TRDSYP (N,DM,DU,MARK)
+C[IX{TRDSYP}*)
+C
+C*****************************************************************
+C                                                                *
+C     Factoring a tridiagonal, symmetric, and positive definite  *
+C     matrix A, that is given by the two N-vectors DM and DU,    *
+C     into the product A = R(TRANSP) * D * R  for a unit upper   *
+C     triangular matrix R by applying the Cholesky-method for    *
+C     tridiagonal matrices. The form of the system matrix A is   *
+C     identical with the one desribed in SUBROUTINE TRDSY.       *
+C[BE*)
+C                                                                *
+C                                                                *
+C     INPUT PARAMETERS:                                          *
+C     =================                                          *
+C     N    : number of equations, N > 2                          *
+C     DM   : N-vector DM(1:N); main diagonal of A                *
+C            DM(1), DM(2), ... , DM(N)                           *
+C     DU   : N-vector DU(1:N); co-diagonal of A                  *
+C            DU(1), DU(2), ... , DU(N-1);                        *
+C            due to symmetry of A its lower and upper            *
+C            co-diagonals coincide                               *
+C                                                                *
+C                                                                *
+C     OUTPUT PARAMETERS:                                         *
+C     ==================                                         *
+C     DM   :) overwritten with auxiliary vectors containing the  *
+C     DU   :) factors of A. The co-diagonal of the unit upper    *
+C             triangular bidiagonal matrix R is stored in DU,    *
+C             while the diagonal matrix D is stored in DM.       *
+C     MARK : error parameter                                     *
+C            MARK= 1 : ok                                        *
+C            MARK= 0 : numerically the matrix A is not strongly  *
+C                      nonsingular.                              *
+C            MARK=-1 : A is not positive definite.               *
+C            MARK=-2 : condition N > 2 is not met.               *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: MACHPD                                  *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author     : Gisela Engeln-Muellges                           *
+C  date       : 25.04.1988                                       *
+C  source     : FORTRAN 77                                       *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DOUBLE PRECISION DM(1:N),DU(1:N)
+C
+C   calculating the machine constant
+C
+      FMACHP = 1.0D0
+   10 FMACHP = 0.5D0 * FMACHP
+      IF (MACHPD(1.0D0+FMACHP) .EQ. 1) GOTO 10
+      FMACHP = FMACHP * 2.0D0
+C
+C   determining the relative error bound
+C
+      EPS = 4.0D0 * FMACHP
+C
+C   checking whether N > 2
+C
+      MARK = -2
+      IF (N .LT. 3) RETURN
+      DU(N) = 0.0D0
+C
+C   testing for a positive definite, strong nonsingular matrix A
+C   for N=1
+C
+      ROW = DABS(DM(1)) + DABS(DU(1))
+      IF (ROW .EQ. 0.0D0) THEN
+         MARK = 0
+         RETURN
+      ENDIF
+      D = 1.0D0/ROW
+      IF (DM(1) .LT. 0.0D0) THEN
+         MARK = -1
+         RETURN
+      ELSEIF (DABS(DM(1))*D .LE. EPS) THEN
+         MARK = 0
+         RETURN
+      ENDIF
+C
+C   factoring A while checking for a positive definite, strong
+C   nonsingular matrix A
+C
+      DUMMY = DU(1)
+      DU(1) = DU(1)/DM(1)
+      DO 20 I=2,N,1
+         ROW = (DABS (DM(I)) + DABS(DU(I)) + DABS(DUMMY))
+         IF (ROW .EQ. 0.0D0) THEN
+            MARK = 0
+            RETURN
+         ENDIF
+         D = 1.0D0/ROW
+         DM(I) = DM(I) - DUMMY * DU(I-1)
+         IF (DM(I) .LT. 0.0D0) THEN
+            MARK = -1
+            RETURN
+         ELSEIF (DABS(DM(I))*D .LE. EPS) THEN
+            MARK = 0
+            RETURN
+         ENDIF
+         IF (I .LT. N) THEN
+            DUMMY = DU(I)
+            DU(I) = DU(I)/DM(I)
+         ENDIF
+   20 CONTINUE
+      MARK=1
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE TRDSYS (N,DM,DU,RS,X)
+C[IX{TRDSYS}*)
+C
+C*****************************************************************
+C                                                                *
+C     Solving a linear system of equations                       *
+C                  A * X = RS                                    *
+C     for a tridiagonal, symmetric, and positive definite matrix *
+C     A, whose tridiagonal factors have been calculated by the   *
+C     SUBROUTINE TRDSYP.                                         *
+C[BE*)
+C     Here the factoring matrices D and R are                    *
+C     used as input matrices and they are stored in the two      *
+C     N-vectors DM and DU, respectively.                         *
+C                                                                *
+C                                                                *
+C     INPUT PARAMETERS:                                          *
+C     =================                                          *
+C     N    : number of equations, N > 2                          *
+C     DM   : N-vector DM(1:N); the diagonal matrix D             *
+C     DU   : N-vector DU(1:N); the upper co-diagonal entries of R*
+C     RS   : N-vector RS(1:N); the right hand side               *
+C                                                                *
+C                                                                *
+C     OUTPUT PARAMETER:                                          *
+C     =================                                          *
+C     X    : N-vector X(1:N) containing the solution of the      *
+C            system of equations                                 *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: TRDSYP, TRDSYS                          *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author     : Gisela Engeln-Muellges                           *
+C  date       : 25.04.1988                                       *
+C  source     : FORTRAN 77                                       *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DOUBLE PRECISION DM(1:N),DU(1:N),RS(1:N),X(1:N)
+C
+C  updating
+C
+      DUMMY = RS(1)
+      RS(1) = DUMMY/DM(1)
+      DO 10 I=2,N,1
+         DUMMY = RS(I) - DU(I-1) * DUMMY
+         RS(I) = DUMMY/DM(I)
+   10 CONTINUE
+C
+C  backsubstitution
+C
+      X(N) = RS(N)
+      DO 20 I=N-1,1,-1
+         X(I) = RS(I) - DU(I) * X(I+1)
+   20 CONTINUE
+      RETURN
+      END

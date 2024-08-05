@@ -1,0 +1,147 @@
+<html>
+<head>
+<title>fortra77/kap08/fdicht.for</title>
+</head>
+<body>
+<a name="anfang"</a>
+<hr>
+<a href="#ende">End of file</a><br>
+<a href="../../inhalt.htm#fortra77kap08fdichtfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+<font size=+2>
+<pre>
+
+<a name="FDICHT3"</a>       SUBROUTINE FDICHT (M, FRE, FIM, P, TETA)
+C
+C*****************************************************************
+C                                                                *
+C  This program  computes the values of the trigonometric        *
+C  interpolating polynomial (i.e. the discrete partial Fourier   *
+C  sum) using the Fast Fourier Transform (FFT) for a given set   *
+C  of function values F(0), F(1), ... , F(M-1) of a P-periodic   *
+C  function F for equidistant nodes t(0), t(1), ... , t(M-1),    * 
+C  t(j) = j*P/M  at a set of shifted nodes t(j) + TETA  for      *
+C  j = 0, 1, ... , M-1.  ("Increase of number of nodes")         *
+C  The double precision vectors  FRE  and  FIM  contain the real *
+C  and imaginary parts of the values for F.                      *
+C                                                                *
+C                                                                *
+C  INPUT PARAMETER:                                              *
+C  ================                                              *
+C  M        : Number of original nodes.                          *
+C             If M is a power of two ( M = 2**ITAU  for a        *
+C             positive integer ITAU ), we make use of the        *
+C             subroutineso  FFT, which runs for all values of M. *
+C             If M  is not a power of two, then we call on FFTB, * 
+C             which limits the available size for its auxiliary  *
+C             vectors F1RE, F1IM, GRE, GIM  to  1 &lt;= M &lt;= 1366.  *
+C             For larger M, the dimension statement inside FFTB  *
+C             must be amended as indicated there.                *
+C  FRE, FIM : DOUBLE PRECISION vectors for the real and          *
+C             imaginary parts for M functional values of F.      * 
+C  P        : Period interval for F.                             *
+C  TETA     : Shift parameter: the newly computed values         *
+C             correspond to arguments shifted by TETA.           *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  ==================                                            *
+C  FRE, FIM : DOUBLE PRECISION vectors;                          *
+C             FRE(j) and FIM(j) are the real and imaginary parts *
+C             of  F(j)  of the trigonometric interpolating       *
+C             polynom at the equidistant nodes                   *
+C                 tneu(j) = t(j) + TETA = j*P/M + TETA           *
+C             for   j = 0, 1, ... , M-1 .                        * 
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  Subroutines used: FFT or FFTB                                 *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author      : Klaus Niederdrenk                               *
+C  Date        : 06.30.1994                                      *
+C  Source code : FORTRAN 77                                      *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      INTEGER M, ITAU
+      DIMENSION FRE(0:M-1), FIM(0:M-1)
+      LOGICAL POT2
+C
+C     Complex multiplication : Real part
+C
+      CMLR(AR,AI,BR,BI)=AR*BR-AI*BI
+C
+C     Complex multiplication : Imaginary part
+C
+      CMLI(AR,AI,BR,BI)=AR*BI+AI*BR
+C
+C     Check whether M is a power of two     
+C
+      ITAU=NINT(LOG(REAL(M))/LOG(2.0)) 
+      IF(2**ITAU .EQ. M) THEN
+        POT2=.TRUE. 
+      ELSE  
+        POT2=.FALSE.
+      ENDIF
+C
+C****************************************************************
+C     Determine discrete Fourier transformation                 *
+C****************************************************************
+C
+      IF( POT2 ) THEN
+        CALL FFT(ITAU,FRE,FIM,0)
+      ELSE
+        CALL FFTB(M,FRE,FIM,0)
+      ENDIF
+C
+C****************************************************************
+C     Evaluate the discrete Fourier transformation for the      * 
+C     shifted nodes                                             *
+C****************************************************************
+C
+      PI=4.0D0*ATAN(1.0D0)
+      FAKTOR=2.0D0*PI*TETA/P
+      TETPI=DBLE(-M/2)*FAKTOR
+      EKR=COS(TETPI)
+      EKI=SIN(TETPI)
+      HR=CMLR(FRE(M/2),FIM(M/2),EKR,EKI)
+      HI=CMLI(FRE(M/2),FIM(M/2),EKR,EKI)
+      DO 10 K = -(M-1)/2, -1
+         TETPI=DBLE(K)*FAKTOR
+         EKR=COS(TETPI)
+         EKI=SIN(TETPI)
+         H       =CMLR(FRE(K+M),FIM(K+M),EKR,EKI)
+         FIM(K+M)=CMLI(FRE(K+M),FIM(K+M),EKR,EKI)
+         FRE(K+M)=H
+         H       =CMLR(FRE(-K),FIM(-K),EKR,-EKI)
+         FIM(-K) =CMLI(FRE(-K),FIM(-K),EKR,-EKI)
+         FRE(-K) =H
+  10  CONTINUE
+      FRE(M/2)=HR
+      FIM(M/2)=HI
+C
+C****************************************************************
+C     Determine functional values                               *
+C****************************************************************
+C
+      IF( POT2 ) THEN
+        CALL FFT(ITAU,FRE,FIM,1)
+      ELSE
+        CALL FFTB(M,FRE,FIM,1)
+      ENDIF
+      RETURN
+      END
+</font>
+</pre>
+<a name="ende"</a>
+<hr>
+<a href="#anfang">Begin of file</a><br>
+<a href="../../inhalt.htm#fortra77kap08fdichtfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+</body>
+</html>

@@ -1,0 +1,340 @@
+C[BA*)
+C[LE*)
+      SUBROUTINE PR3TRA(NX, X, Y, Z, F,M, MARK, C, A, IWORK, WK,
+C[IX{PR3TRA}*)
+     F                                   XMEAN, YMEAN, ZMEAN, R)
+C
+C*****************************************************************
+C                                                                *
+C PR3TRA computes three-dimensional surface splines for arbitrary*
+C given points (X(I),Y(I),Z(I),F(X(I),Y(I)), I=1, ..., NX.       *
+C The nodes (X(I),Y(I),Z(I)) must be distinct and F must be a    *
+C function, i.e., for each (X,Y,Z) in the node set there must    *
+C correspond a unique  F=F(X,Y,Z). The nodes need not be ordered.*
+C[BE*)
+C The desired smoothness of the spline, i. e., its derivative    *
+C order should be stipulated as rather low since the condition   *
+C number of the system of equations that has to be solved worsens*
+C with increasing derivative order.                              *
+C Tests indicate that derivative orders between  3 and 5  can be *
+C recommended. Higher orders showed improvement only in rare     *
+C cases. For an increasing number of nodes, i. e., a decreasing  *
+C distance between the nodes the condition number of the linear  *
+C system also tends to worsen.                                   *
+C                                                                *
+C INPUT PARAMETERS:                                              *
+C =================                                              *
+C NX     :  Number of nodes                                      *
+C X,Y,Z  :  NX-vectors ..(1:NX); the coordinates of the nodes    *
+C F      :  NX-vector F(1:NX); the functional values at the nodes*
+C M      :  derivative order used to determine the coefficients  *
+C                                                                *
+C OUTPUT PARAMETERS:                                             *
+C ==================                                             *
+C                                                                *
+C C      :  vector C(1:(NX + M*(M+1)*(M+2)/6)); the coefficients *
+C           of the spline                                        *
+C                                                                *
+C MARK   :  indicates whether the linear system could be solved: *
+C           MARK = 1:  all is ok                                 *
+C           MARK = 0:  system matrix is numerically singular     *
+C XMEAN  : )                                                     *
+C YMEAN  : )  refer to  SUBROUTINE TRBALL                        *
+C ZMEAN  : )                                                     *
+C R      : )                                                     *
+C                                                                *
+C AUXILIARY PARAMETERS:                                          *
+C =====================                                          *
+C A      : vector A(1:((NX + M*(M+1)*(M+2)/6) *                  *
+C                         * (NX + M*(M+1)*(M+2)/6 + 3))/2)       *
+C IWORK  : integer vector IWORK(1:(NX + M*(M+1)*(M+2)/6))        *
+C WK     : vector WK(1:((NX + M*(M+1)*(M+2)/6)*                  *
+C                         * (NX + M*(M+1)*(M+2)/6 + 1)/2))       *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C Required subroutines: ALPHA3, GAMMA3, NEXT3, E3, CEPSPM,       *
+C                       ZSPMMK, PCOSOL, PCOLTG, SESSPM, SCAPRO,  *
+C                       VECMWC, ABSSUM, INDMAX, VECADD, VECXCH,  *
+C                       TRBALL                                   *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C Authors     : Richard Reuter (1983), Hartmut Turowski          *
+C Date        : 12.10.1989                                       *
+C Source      : FORTRAN 77                                       *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C..
+C..   declarations
+C..
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DIMENSION X(NX),Y(NX),Z(NX),F(NX)
+      DIMENSION C(NX+M*(M+1)*(M+2)/6)
+      DIMENSION A((NX+M*(M+1)*(M+2)/6)*
+     F            (NX+M*(M+1)*(M+2)/6+3)/2)
+      DIMENSION WK((NX+M*(M+1)*(M+2)/6)*
+     F             (NX+M*(M+1)*(M+2)/6+1)/2)
+      DIMENSION IWORK(NX+M*(M+1)*(M+2)/6)
+C..
+C..   size of the matrix
+C..
+      M3 = M*(M+1)*(M+2)/6
+      NM = NX + M3
+C..
+C..   pointer for the polynomial part of the matrix
+C..
+      NXX= 1 + (NX*(NX+1))/2
+C..
+C..   Initialize error parameter
+C..
+      MARK = 1
+C..
+C..   transform all nodes X(I), Y(I), Z(I)
+C..   onto the unit ball
+C..
+      CALL TRBALL (X,Y,Z,NX,XMEAN,YMEAN,ZMEAN,R)
+C..
+C..   Form the system matrix:
+C..   its polynomial part P appears in the upper right corner
+C..   in condensed form
+C..
+      CALL ALPHA3(NX,X,Y,Z,M-1,A(NXX),
+     F            IWORK(1),IWORK(1+M3),IWORK(1+2*M3))
+C..
+C..   G part of the system matrix:
+C..   in the upper left corner in condensed form
+C..
+      CALL GAMMA3(NX,X,Y,Z,M,A)
+C..
+C..   set up the right hand side
+C..
+      DO 10 I = 1,NX
+            C(I) = F(I)
+10    CONTINUE
+      DO 20 I = NX+1, NM
+            C(I) = 0.0D0
+20    CONTINUE
+C..
+C..   factor the system matrix
+C..
+      CALL CEPSPM(A,NM,C,IWORK,RCOND,A((NM*(NM+1))/2 + 1),WK)
+C..
+C..   Stop if the system matrix is numerically singular
+C..
+      IF (1.0D0 .EQ. 1.0D0+RCOND) THEN
+         MARK = 0
+         RETURN
+      ENDIF
+C..
+C..   solve the system
+C..
+      CALL SESSPM(WK,NM,IWORK,C)
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      DOUBLE PRECISION FUNCTION APPTR3(X0,Y0,Z0,NX,M,X,Y,Z,C,
+C[IX{APPTR3}*)
+     F                                   XMEAN,YMEAN,ZMEAN,R)
+C
+C*****************************************************************
+C                                                                *
+C Evaluation function for the interpolation                      *
+C[BE*)
+C                                                                *
+C INPUT PARAMETERS:                                              *
+C =================                                              *
+C X0,Y0,Z0 :  location where the function is to be evaluated     *
+C NX       :  number of nodes                                    *
+C M        :  derivative order                                   *
+C X,Y,Z    :  NX-vectors ..(1:NX); the coordinates of the nodes  *
+C C        :  vector C(1:(NX + M*(M+1)*(M+2)/6)) of coefficients *
+C XMEAN  : )                                                     *
+C YMEAN  : )  refer to  SUBROUTINE TRBALL                        *
+C ZMEAN  : )                                                     *
+C R      : )                                                     *
+C                                                                *
+C OUTPUT PARAMETER:                                              *
+C =================                                              *
+C APPTR3   :  approximate value at (X0,Y0,Z0)                    *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C Required subroutines:  none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C Authors     : Richard Reuter (1983), Hartmut Turowski          *
+C Date        : 12.10.1989                                       *
+C Source      : FORTRAN 77                                       *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C..
+C..   declarations
+C..
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DIMENSION X(NX),Y(NX),Z(NX),C(NX+(M*(M+1)*(M+2)/6))
+C..
+C..   Transform the point (X0,Y0,Z0), where we want to
+C..   evaluate to the unit ball
+C..
+      X0 = R * (X0 - XMEAN)
+      Y0 = R * (Y0 - YMEAN)
+      Z0 = R * (Z0 - ZMEAN)
+
+C..
+C..   Depending on m there are several cases:
+C..   1. M = 1, 2, 3 ; separately coded, fast
+C..   2. M > 3       ; each monomial is represented in the form
+C..                    (X**IX)*(Y**IY)*(Z**IZ).
+C..                    The evaluation is slower and prone to
+C..                    rounding errors.
+C..
+C..   the first polynomial is  1
+C..
+      AP = C(NX+1)
+      IF (M .EQ. 1) GOTO 40
+      IF (M .EQ. 2) THEN
+C..
+C..   remaining monomials of degree 1
+C..
+            AP = AP + C(NX+2)*X0 + C(NX+3)*Y0 + C(NX+4)*Z0
+      ELSE IF (M .EQ. 3) THEN
+C..
+C..   remaining monomials of degree 2
+C..
+            AP = AP + (C(NX+2) + C(NX+5)*X0 + C(NX+6)*Y0)*X0
+     F              + (C(NX+3) + C(NX+8)*Y0 + C(NX+9)*Z0)*Y0
+     F              + (C(NX+4) + C(NX+7)*X0 +C(NX+10)*Z0)*Z0
+      ELSE
+C..
+C..   remaining monomials of degree <= M-1
+C..
+         L = 1
+         DO 30 I = 1,M-1
+            DO 20 IX = I,0,-1
+               DO 10 IY = I-IX,0,-1
+                  IZ = I - IX -IY
+                  L = L+1
+                  IF (IX .NE. 0 .AND. IY .NE. 0 .AND. IZ .NE. 0) THEN
+                     AP = AP + C(NX+L)*(X0**IX)*(Y0**IY)*(Z0**IZ)
+                  ELSE IF (IX .NE. 0 .AND. IY .NE. 0) THEN
+                     AP = AP + C(NX+L)*(X0**IX)*(Y0**IY)
+                  ELSE IF (IX .NE. 0 .AND. IZ .NE. 0) THEN
+                     AP = AP + C(NX+L)*(X0**IX)*(Z0**IZ)
+                  ELSE IF (IY .NE. 0 .AND. IZ .NE. 0) THEN
+                     AP = AP + C(NX+L)*(Y0**IY)*(Z0**IZ)
+                  ELSE IF (IX .NE. 0) THEN
+                     AP = AP + C(NX+L)*(X0**IX)
+                  ELSE IF (IY .NE. 0) THEN
+                     AP = AP + C(NX+L)*(Y0**IY)
+                  ELSE
+                     AP = AP + C(NX+L)*(Z0**IZ)
+                  ENDIF
+10             CONTINUE
+20          CONTINUE
+30       CONTINUE
+      ENDIF
+40    CONTINUE
+C..
+C..   Kernelfunction
+C..
+C..   one could call the FUNCTION E3(X,Y,Z) now, but this would
+C..   slow down the actual evaluation, hence we code directly here.
+C..
+      DO 50 I = 1, NX
+         R = (X(I)-X0)**2 + (Y(I)-Y0)**2 + (Z(I)-Z0)**2
+         AP = AP + C(I)*(DSQRT(R)**(2*M-3))
+50    CONTINUE
+      APPTR3 = AP
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE TRBALL (X,Y,Z,NX,XMEAN,YMEAN,ZMEAN,R)
+C[IX{TRBALL}*)
+C
+C*****************************************************************
+C                                                                *
+C Transform all nodes (X(I),Y(I),Z(I)) to the unit ball.         *
+C[BE*)
+C                                                                *
+C INPUT PARAMETERS:                                              *
+C =================                                              *
+C NX    : number of nodes                                        *
+C X,Y,Z : NX-vectors ..(1:NX); the coordinates of the nodes      *
+C                                                                *
+C OUTPUT PARAMETERS:                                             *
+C ==================                                             *
+C X,Y,Z : NX-vectors ..(1:NX); the nodes transformed to the unit *
+C         ball                                                   *
+C XMEAN : arithmetic mean of the X(I)                            *
+C YMEAN : arithmetic mean of the Y(I)                            *
+C ZMEAN : arithmetic mean of the Z(I)                            *
+C R     : largest euclidean distance of a node (X(I),Y(I),Z(I)   *
+C         from the center of gravity (XMEAN,YMEAN,ZMEAN)         *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C Required subroutines: none                                     *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C Author     : Hartmut Turowski                                  *
+C Date       : 01.01.1990                                        *
+C Source     : FORTRAN 77                                        *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C..
+C..   declarations
+C..
+      DOUBLE PRECISION X(NX),Y(NX),Z(NX),XMEAN,YMEAN,ZMEAN,
+     F                 R,RHILF
+C..
+C..   compute the arithmetic means of the
+C..   X(I), Y(I)  and  Z(I)
+C..
+      XMEAN = 0.0D0
+      YMEAN = 0.0D0
+      ZMEAN = 0.0D0
+      DO   10   I = 1, NX
+           XMEAN = XMEAN + X (I)
+           YMEAN = YMEAN + Y (I)
+           ZMEAN = ZMEAN + Z (I)
+10    CONTINUE
+      XMEAN = XMEAN / DBLE (NX)
+      YMEAN = YMEAN / DBLE (NX)
+      ZMEAN = ZMEAN / DBLE (NX)
+C..
+C..   compute the maximal distance of a node (X(I),Y(I),Z(I))
+C..   from (XMEAN,YMEAN,ZMEAN)
+C..
+      R = 0.0D0
+      DO   20   I = 1, NX
+           RHILF = DSQRT((X(I)-XMEAN)**2
+     F                 + (Y(I)-YMEAN)**2
+     F                 + (Z(I)-ZMEAN)**2)
+           R = DMAX1 (RHILF,R)
+20    CONTINUE
+      R = 1.0D0 / R
+C..
+C..   Transform to the unit ball
+C..
+      DO   30   I = 1, NX
+           X (I) = R * (X (I) - XMEAN)
+           Y (I) = R * (Y (I) - YMEAN)
+           Z (I) = R * (Z (I) - ZMEAN)
+30    CONTINUE
+      RETURN
+      END

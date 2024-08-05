@@ -1,0 +1,333 @@
+C[BA*)
+C[LE*)
+C[LE*)
+C[LE*)
+C[FE{F 16.6}
+C[  {Gau"s Cubature Formulas for Rectangles}
+C[  {Gau"s Cubature Formulas for Rectangles}*)
+C[LE*)
+      SUBROUTINE K4GAUE(USERF,A,B,IP,C,D,IQ,METHOD,MOLD,CREC,
+C[IX{K4GAUE}*)
+     +                  ESTDIV,DIVIAT,WORK,IERR,IUFCLL)
+C
+C*****************************************************************
+C                                                                *
+C Cubature over rectangles via NEWTON-COTES formulas for GAUSSIAN*
+C nodes.                                                         *
+C[BE*)
+C                                                                *
+C The FUNCTION USERF(X,Y) shall be integrated using summed       *
+C GAUSSIAN formulas for the rectangle [A,B] x [C,D].             *
+C                                                                *
+C                                                                *
+C INPUT PARAMETERS:                                              *
+C =================                                              *
+C USERF   : user defined FUNCTION USERF(X,Y), whose integral is  *
+C           to be computed.                                      *
+C           The FUNCTION USERF must be declared as EXTERNAL in   *
+C           the calling program.                                 *
+C           The FUNCTION should have the following form:         *
+C                  DOUBLE PRECISION FUNCTION USERF(X,Y)          *
+C                  DOUBLE PRECISION X,Y                          *
+C                         .                                      *
+C                         .                                      *
+C                         .                                      *
+C                  USERF=F(X,Y)                                  *
+C                         .                                      *
+C                         .                                      *
+C                         .                                      *
+C                  RETURN                                        *
+C                  STOP                                          *
+C                                                                *
+C A       : DOUBLE PRECISION left hand endpoint in X-direction   *
+C B       : DOUBLE PRECISION right hand endpoint in X-direction  *
+C IP      : INTEGER, the number of sub-intervals in X-direction  *
+C C       : DOUBLE PRECISION lower endpoint in Y-direction       *
+C D       : DOUBLE PRECISION upper endpoint in Y-direction       *
+C IQ      : INTEGER, the number of sub-intervals in Y-direction  *
+C METHOD  : INTEGER, designating the method: 0 <= METHOD <= 7 :  *
+C           METHOD = 0 : trapezoidal rule                        *
+C                  = 1 : summed trapezoidal rule                 *
+C                  = 2 : Simpson's rule                          *
+C                  = 3 : 3/8 rule                                *
+C                  = 4 : 4/90 rule                               *
+C                  = 5 : 5/288 rule                              *
+C                  = 6 : 6/840 rule                              *
+C                  = 7 : 7/17280 rule.                           *
+C MOLD    : INTEGER, the number in METHOD at the previous call.  *
+C           Upon first call we must have: MOLD different from    *
+C           METHOD                                               *
+C           If K4NECN is called repeatedly with METHOD=MOLD the  *
+C           internal initializing of parameters is skipped.      *
+C ESTDIV  : LOGICAL variable, indicates whether error estimate   *
+C           is to be computed (ESTDIV=TRUE) or not (ESTDIV=FALSE)*
+C WORK    : 2-dimensional DOUBLE PRECISION array                 *
+C           WORK(3,0:METHOD-1). If METHOD=MOLD this array must   *
+C           contain the initializing parameters for the method.  *
+C                                                                *
+C                                                                *
+C OUTPUT PARAMETERS:                                             *
+C ==================                                             *
+C MOLD    : INTEGER indicating method used                       *
+C CREC    : DOUBLE PRECISION value for the integral              *
+C DIVIAT  : DOUBLE PRECISION error estimate                      *
+C           If ESTDIV=TRUE the error is estimated by one extra   *
+C           cubature for the halved step size.                   *
+C IERR    : error parameter: IERR=0 all is ok                    *
+C                            IERR=1 number of intervals in       *
+C                                   X-direction erroneous        *
+C                            IERR=2 number of intervals in       *
+C                                   Y-direction erroneous        *
+C                            IERR=3 Number of method erroneous   *
+C                            IERR=4 interval of integration has  *
+C                                   length zero                  *
+C IUFCLL  : INTEGER, the number of functional evaluations        *
+C                                                                *
+C                                                                *
+C LOCAL VARIABLES:                                               *
+C =================                                              *
+C I, J, K : INTEGER, loop counters                               *
+C II, JJ  : INTEGER, loop counters                               *
+C KMAX    : INTEGER number of cubature passes                    *
+C IPX     : INTEGER number of intervals in X-direction           *
+C IPY     : INTEGER number of intervals in Y-direction           *
+C DI      : DOUBLE PRECISION value for 2*I+1                     *
+C DJ      : DOUBLE PRECISION value for 2*J+1                     *
+C HX      : DOUBLE PRECISION step size in X-direction            *
+C HY      : DOUBLE PRECISION step size in Y-direction            *
+C CRECH   : DOUBLE PRECISION variable used for error estimation  *
+C FAC     : DOUBLE PRECISION variable used for CREC              *
+C HELPC   : DOUBLE PRECISION variable used for CREC              *
+C HELPX   : DOUBLE PRECISION variable used for CREC              *
+C HELPY   : DOUBLE PRECISION variable used for CREC              *
+C                                                                *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: K4GINI                                  *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author   : Volker Krger                                      *
+C  Date     : 06.12.1991                                         *
+C  Source   : FORTRAN 77                                         *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+C Declarations
+C
+      DOUBLE PRECISION WORK(2,0:METHOD),A,B,C,D,CREC,CRECH,DIVIAT,
+     +                 HX,HY,DI,DJ,FAC,HELPX,HELPY,HELPC,USERF
+C
+C Initialize the LOGICAL variable ESTDIV
+C
+      LOGICAL ESTDIV
+C
+C Initialize IUFCLL
+C
+      IUFCLL=0
+C
+C Check input data for validity
+C
+      IF (IP .LT. 1) THEN
+         IERR=1
+         RETURN
+      ELSEIF (IQ .LT. 1) THEN
+         IERR=2
+         RETURN
+      ELSEIF (METHOD .LT. 0 .OR. METHOD .GT. 7) THEN
+         IERR=3
+         RETURN
+      ELSEIF (A .EQ. B .OR. C .EQ. D) THEN
+         IERR=4
+         RETURN
+      ELSE
+         IERR=0
+      ENDIF
+C
+C Initialize as necessary
+C
+      IF (METHOD .NE. MOLD) THEN
+        CALL K4GINI(METHOD,WORK)
+        MOLD=METHOD
+      ENDIF
+C
+C Determine number of needed cubature passes
+C
+      IF (ESTDIV) THEN
+        KMAX=2
+      ELSE
+        KMAX=1
+      ENDIF
+C
+C Determine actual number of sub-intervals
+C in X- and Y-directions
+C
+      DO 10 K=1,KMAX
+         IPX=K*IP
+         IQY=K*IQ
+C
+C Initialize CREC
+C
+         CREC=0.0D0
+C
+C Determine step sizes in X- and Y-directions
+C
+         HX=0.5D0*(B-A)/DBLE(IPX)
+         HY=0.5D0*(D-C)/DBLE(IQY)
+C
+C Find approximation for the integral
+C
+         DO 20 I=0,IPX-1
+            DI=2.0D0*DBLE(I)+1.0D0
+            DO 30 J=0,IQY-1
+               DJ=2.0D0*DBLE(J)+1.0D0
+               DO 40 II=0,METHOD
+                  DO 50 JJ=0,METHOD
+                     FAC=HX*HY*WORK(2,II)*WORK(2,JJ)
+                     HELPX=A+HX*(WORK(1,II)+DI)
+                     HELPY=C+HY*(WORK(1,JJ)+DJ)
+                     HELPC=USERF(HELPX,HELPY)
+                     IUFCLL=IUFCLL+1
+                     CREC=CREC+FAC*HELPC
+50                CONTINUE
+40             CONTINUE
+30          CONTINUE
+20       CONTINUE
+C
+C If estimating the error, store the first integral value
+C
+         IF (ESTDIV .AND. K .EQ. 1) CRECH=CREC
+10    CONTINUE
+C
+C Error estimation
+C
+      IF (ESTDIV) DIVIAT=(CREC-CRECH)/3.0D0
+C
+C Return to calling program
+C
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE K4GINI(METHOD,WORK)
+C[IX{K4GINI}*)
+C
+C*****************************************************************
+C                                                                *
+C Subroutine that initializes the constants in K4GAUE depending  *
+C on method chosen.                                              *
+C[BE*)
+C                                                                *
+C                                                                *
+C INPUT PARAMETER:                                               *
+C ================                                               *
+C METHOD  : INTEGER designating the method, 0 <= METHOD <= 7     *
+C                                                                *
+C                                                                *
+C OUTPUT PARAMETER:                                              *
+C =================                                              *
+C WORK    : 2-dimensional DOUBLE PRECISION array                 *
+C           WORK(2,0:METHOD) containing the constants for the    *
+C           method                                               *
+C                                                                *
+C                                                                *
+C LOCAL VARIABLE:                                                *
+C ===============                                                *
+C I       : INTEGER, loop parameter                              *
+C J       : INTEGER, auxiliary variable                          *
+C                                                                *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author   : Volker Krger                                      *
+C  Date     : 12.06.1991                                         *
+C  Source   : FORTRAN 77                                         *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+C Declarations
+C
+      DOUBLE PRECISION WORK(2,0:METHOD)
+C
+C Set up upper half of WORK
+C
+      IF (METHOD .EQ. 0) THEN
+         WORK(1,0)=0.0D0
+         WORK(2,0)=2.0D0
+         J=0
+      ELSEIF (METHOD .EQ. 1) THEN
+         WORK(1,0)=-0.577350269189626D0
+         WORK(2,0)=1.0D0
+         J=0
+      ELSEIF (METHOD .EQ. 2) THEN
+         WORK(1,0)=-0.774596669241483D0
+         WORK(2,0)=0.5555555555555556D0
+         WORK(1,1)=0.0D0
+         WORK(2,1)=0.8888888888888888D0
+         J=1
+      ELSEIF (METHOD .EQ. 3) THEN
+         WORK(1,0)=-0.861136311594053D0
+         WORK(2,0)=0.347854845137454D0
+         WORK(1,1)=-0.339981043584856D0
+         WORK(2,1)=0.652145154862546D0
+         J=1
+      ELSEIF (METHOD .EQ. 4) THEN
+         WORK(1,0)=-0.906179845938664D0
+         WORK(2,0)=0.236926885056189D0
+         WORK(1,1)=-0.538469310105683D0
+         WORK(2,1)=0.478628670499366D0
+         WORK(1,2)=0.0D0
+         WORK(2,2)=0.5688888888888889D0
+         J=2
+      ELSEIF (METHOD .EQ. 5) THEN
+         WORK(1,0)=-0.9324695142031521D0
+         WORK(2,0)=0.17132449237917D0
+         WORK(1,1)=-0.661209386466265D0
+         WORK(2,1)=0.360761573048139D0
+         WORK(1,2)=-0.238619186083197D0
+         WORK(2,2)=0.467913934572691D0
+         J=2
+      ELSEIF (METHOD .EQ. 6) THEN
+         WORK(1,0)=-0.949107912342759D0
+         WORK(2,0)=0.12948496616887D0
+         WORK(1,1)=-0.741531185599394D0
+         WORK(2,1)=0.279705391489277D0
+         WORK(1,2)=-0.405845151377397D0
+         WORK(2,2)=0.381830050505119D0
+         WORK(1,3)=0.0D0
+         WORK(2,3)=0.417959183673469D0
+         J=3
+      ELSEIF (METHOD .EQ. 7) THEN
+         WORK(1,0)=-0.960289856497536D0
+         WORK(2,0)=0.101228536290376D0
+         WORK(1,1)=-0.7966664774136269D0
+         WORK(2,1)=0.222381034453374D0
+         WORK(1,2)=-0.525532409916329D0
+         WORK(2,2)=0.313706645877887D0
+         WORK(1,3)=-0.18343464249565D0
+         WORK(2,3)=0.362683783378362D0
+         J=3
+      ENDIF
+C
+C Set up lower half of WORK by symmetry
+C
+      DO 10 I=0,J
+         WORK(1,METHOD-I)=-WORK(1,I)
+         WORK(2,METHOD-I)=WORK(2,I)
+10    CONTINUE
+C
+C Return to calling program
+C
+      RETURN
+      END

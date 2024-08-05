@@ -1,0 +1,505 @@
+<html>
+<head>
+<title>fortra77/kap12/prob3.for</title>
+</head>
+<body>
+<a name="anfang"</a>
+<hr>
+<a href="#ende">End of file</a><br>
+<a href="../../inhalt.htm#fortra77kap12prob3for">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+<font size=+2>
+<pre>
+
+
+
+<a name="PROB35"</a>      SUBROUTINE PROB3(NX, X, Y, Z, F,M, MARK, C, A, IWORK, WK)
+C
+C*****************************************************************
+C                                                                *
+C PROB3 computes three-dimensional surface splines for arbitrary *
+C given points (X(I),Y(I),Z(I),F(X(I),Y(I)), I=1, ..., NX.       *
+C The nodes (X(I),Y(I),Z(I)) must be distinct and F must be a    *
+C function, i.e., for each (X,Y,Z) in the node set there must    *
+C correspond a unique  F=F(X,Y,Z). The nodes need not be ordered.*
+C The desired smoothness of the spline, i. e., its derivative    *
+C order should be stipulated as rather low since the condition   *
+C number of the system of equations that has to be solved worsens*
+C with increasing derivative order.                              *
+C Tests indicate that derivative orders between  3 and 5  can be *
+C recommended. Higher orders showed improvement only in rare     *
+C cases. For an increasing number of nodes, i. e., a decreasing  *
+C distance between the nodes the condition number of the linear  *
+C system also tends to worsen.                                   *
+C                                                                *
+C INPUT PARAMETERS:                                              *
+C =================                                              *
+C NX     :  Number of nodes                                      *
+C X,Y,Z  :  NX-vectors ..(1:NX); the coordinates of the nodes    *
+C F      :  NX-vector F(1:NX); the functional values at the nodes*
+C M      :  derivative order used to determine the coefficients  *
+C                                                                *
+C OUTPUT PARAMETERS:                                             *
+C ==================                                             *
+C                                                                *
+C C      :  vector C(1:(NX + M*(M+1)*(M+2)/6)); the coefficients *
+C           of the spline                                        *
+C                                                                *
+C MARK   :  indicates whether the linear system could be solved: *
+C           MARK = 1:  all is ok                                 *
+C           MARK = 0:  system matrix is numerically singular     *
+C                                                                *
+C AUXILIARY PARAMETERS:                                          *
+C =====================                                          *
+C A      : vector A(1:((NX + M*(M+1)*(M+2)/6) *                  *
+C                         * (NX + M*(M+1)*(M+2)/6 + 3))/2)       *
+C IWORK  : integer vector IWORK(1:(NX + M*(M+1)*(M+2)/6))        *
+C WK     : vector WK(1:((NX + M*(M+1)*(M+2)/6)*                  *
+C                         * (NX + M*(M+1)*(M+2)/6 + 1)/2))       *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C Required subroutines: ALPHA3, GAMMA3, NEXT3, E3, CEPSPM,       *
+C                       ZSPMMK, PCOSOL, PCOLTG, SESSPM, SCAPRO,  *
+C                       VECMWC, ABSSUM, INDMAX, VECADD, VECXCH,  *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C Authors     : Richard Reuter (1983), Hartmut Turowski          *
+C Date        : 12.10.1989                                       *
+C Source      : FORTRAN 77                                       *
+C                                                                *
+C*****************************************************************
+C..
+C..   declarations
+C..
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DIMENSION X(NX),Y(NX),Z(NX),F(NX)
+      DIMENSION C(NX+M*(M+1)*(M+2)/6)
+      DIMENSION A((NX+M*(M+1)*(M+2)/6)*
+     F            (NX+M*(M+1)*(M+2)/6+3)/2)
+      DIMENSION WK((NX+M*(M+1)*(M+2)/6)*
+     F            ((NX+M*(M+1)*(M+2)/6)+1)/2)
+      DIMENSION IWORK(NX+M*(M+1)*(M+2)/6)
+C..
+C..   Order of the matrix
+C..
+      M3 = M*(M+1)*(M+2)/6
+      NM = NX + M3
+C..
+C..   Pointer for the polynomial part of the system matrix
+C..
+      NXX= 1 + (NX*(NX+1))/2
+C..
+C..   Initialize error parameter
+C..
+      MARK = 1
+C..
+C..   Form system matrix:
+C..   Polynomial part P appears in condensed form in upper right corner
+C..
+      CALL ALPHA3(NX,X,Y,Z,M-1,A(NXX),
+     F            IWORK(1),IWORK(1+M3),IWORK(1+2*M3))
+C..
+C..   G part of the matrix:
+C..   condensed in upper left corner
+C..
+      CALL GAMMA3(NX,X,Y,Z,M,A)
+C..
+C..   Set up right hand side
+C..
+      DO 10 I = 1,NX
+            C(I) = F(I)
+10    CONTINUE
+      DO 20 I = NX+1, NM
+            C(I) = 0.0D0
+20    CONTINUE
+C..
+C..   factor the system matrix
+C..
+      CALL CEPSPM(A,NM,C,IWORK,RCOND,A((NM*(NM+1))/2 + 1),WK)
+C..
+C..   Stop if the system matrix is numerically singular
+C..
+      IF (1.0D0 .EQ. 1.0D0+RCOND) THEN
+         MARK = 0
+         RETURN
+      ENDIF
+C..
+C..   Solve the linear system
+C..
+      CALL SESSPM(WK,NM,IWORK,C)
+      RETURN
+      END
+C
+C
+
+<a name="ALPHA3131"</a>      SUBROUTINE ALPHA3(NX,X,Y,Z,M,A,IDX,IDY,IDZ)
+C
+C*****************************************************************
+C                                                                *
+C Computes the polynomial part P of the system matrix.           *
+C                                                                *
+C INPUT PARAMETERS:                                              *
+C =================                                              *
+C NX   : number of nodes                                         *
+C X,Y,Z: NX-vectors ..(1:NX); the coordinates of the nodes       *
+C M    : derivative order                                        *
+C                                                                *
+C OUTPUT PARAMETERS:                                             *
+C ==================                                             *
+C A    : polynomial part of the system matrix in condensed form: *
+C        A(1:(((M+1)*(M+2)*(M+3)/6) *                            *
+C                          * (2*NX+((M+1)*(M+2)*(M+3)/6)+1)/2)   *
+C                                                                *
+C AUXILIARY PARAMETERS:                                          *
+C =====================                                          *
+C IDX  : ]                                                       *
+C IDY  : ] vectors ..(1:((M+1)*(M+2)*(M+3)/6))                   *
+C IDZ  : ]                                                       *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C Required subroutines: NEXT3                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C Authors     : Richard Reuter (1983), Hartmut Turowski          *
+C Date        : 12.10.1989                                       *
+C Source      : FORTRAN 77                                       *
+C                                                                *
+C*****************************************************************
+C..
+C..   declarations
+C..
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DIMENSION X(NX),Y(NX),Z(NX)
+      DIMENSION A((M+1)*(M+2)*(M+3)/6*(2*NX
+     F           +(M+1)*(M+2)*(M+3)/6+1)/2)
+      DIMENSION IDX(((M+1)*(M+2)*(M+3)/6))
+      DIMENSION IDY(((M+1)*(M+2)*(M+3)/6))
+      DIMENSION IDZ(((M+1)*(M+2)*(M+3)/6))
+C..
+C..   the first monomial is  1.0
+C..
+      DO 10 I = 1, NX
+         A(I) = 1.0D0
+10    CONTINUE
+      A(NX+1) = 0.0D0
+      IDX(1) = 0
+      IDY(1) = 0
+      IDZ(1) = 0
+      L = 1
+      DO 40 I = 1,M
+         DO 30 IX = I,0,-1
+            DO 20 IY = I-IX,0,-1
+               IZ = I - IY - IX
+               L = L+1
+               IDX(L) = IX
+               IDY(L) = IY
+               IDZ(L) = IZ
+20          CONTINUE
+30       CONTINUE
+40    CONTINUE
+      DO 90 I = 2, L
+C..
+C..   determine the index of the monomial that needs
+C..   to be multiplied by  X,Y or Z
+C..
+         CALL NEXT3(I,IDX,IDY,IDZ,ID,K)
+         KL = ID*(ID-1)/2 + NX*(ID-1)
+         KLI= I *(I -1)/2 + NX*(I -1)
+         IF (K .EQ. 1) THEN
+            DO 50 J = 1, NX
+               A(KLI+J) = A(KL+J)*X(J)
+50          CONTINUE
+         ELSE IF (K .EQ. 2) THEN
+            DO 60 J = 1, NX
+               A(KLI+J) = A(KL+J)*Y(J)
+60          CONTINUE
+         ELSE
+            DO 70 J = 1, NX
+               A(KLI+J) = A(KL+J)*Z(J)
+70          CONTINUE
+         ENDIF
+C..
+C..   zero the rest of the system matrix
+C..
+         DO 80 J = KLI+NX+1, KLI+NX+I
+            A(J) = 0.0D0
+80       CONTINUE
+90    CONTINUE
+      RETURN
+      END
+C
+C
+
+<a name="NEXT3236"</a>      SUBROUTINE NEXT3(I,IDX,IDY,IDZ,ID,K)
+C
+C*****************************************************************
+C                                                                *
+C SUBROUTINE that efficiently determines all three-dimensional   *
+C monomials up to degree M; refer to SUBROUTINE ALPHA3           *
+C                                                                *
+C INPUT PARAMETERS:                                              *
+C =================                                              *
+C I   :  Index of the two-dimensional monomial that was last     *
+C        computed                                                *
+C IDX :  ]  I-vectors ID..(1:I); the powers of X, Y or Z in the  *
+C IDY :  ]  monomials with index 1 to I                          *
+C IDZ :  ]                                                       *
+C                                                                *
+C OUTPUT PARAMETERS:                                             *
+C ==================                                             *
+C ID  :  Index of the monomial, that must be multiplied by X,Y   *
+C        or Z in order to obtain the I-th monomial               *
+C K   :  Switch that toggles multiplication by X,Y or Z          *
+C        K=1 : Monom(I) = Monom(ID)*X                            *
+C        K=2 : Monom(I) = Monom(ID)*Y                            *
+C        K=3 : Monom(I) = Monom(ID)*Z                            *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C Required subroutines:  none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C Authors     : Richard Reuter (1983), Hartmut Turowski          *
+C Date        : 12.10.1989                                       *
+C Source      : FORTRAN 77                                       *
+C                                                                *
+C*****************************************************************
+C..
+C..   declarations
+C..
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DIMENSION IDX(I),IDY(I),IDZ(I)
+C..
+      N = IDX(I) + IDY(I) + IDZ(I)
+      IF (IDX(I) .NE. 0) THEN
+         K = 1
+         ID = I -(N*(N+1))/2
+      ELSE IF (IDY(I) .NE. 0) THEN
+         K = 2
+         ID = I + 1 - ((N+1)*(N+2))/2
+      ELSE
+         K = 3
+         ID = I - ((N+1)*(N+2))/2
+      ENDIF
+      RETURN
+      END
+C
+C
+C
+
+<a name="GAMMA3299"</a>      SUBROUTINE GAMMA3(NX,X,Y,Z,M,A)
+C
+C*****************************************************************
+C                                                                *
+C Initialize the G part of the system matrix.                    *
+C                                                                *
+C INPUT PARAMETERS:                                              *
+C =================                                              *
+C NX   :  number of nodes                                        *
+C X,Y,Z:  NX-vectors ..(1:NX); the coordinates of the nodes      *
+C M    :  derivative order                                       *
+C                                                                *
+C OUTPUT PARAMETERS:                                             *
+C ==================                                             *
+C A    :  vector A(1:(NX*(NX+1)/2)); the G part of the system    *
+C         matrix in condensed form                               *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C Required subroutines: E2                                       *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C Authors     : Richard Reuter (1983), Hartmut Turowski          *
+C Date        : 12.10.1989                                       *
+C Source      : FORTRAN 77                                       *
+C                                                                *
+C*****************************************************************
+C..
+C..   declarations
+C..
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DIMENSION X(NX),Y(NX),Z(NX),A(NX*(NX+1)/2)
+C..
+C..   Calculate the G part
+C..
+      L = 0
+      DO 20 I = 1, NX
+         DO 10 K = 1, I - 1
+            L = L + 1
+C..
+C..   for acceleration possibly use the inline-code of E3
+C..
+            A(L) = E3(X(K)-X(I),Y(K)-Y(I),Z(K)-Z(I),M)
+10       CONTINUE
+         L = L + 1
+C..
+C..   Set diagonal of G equal to zero
+C..
+         A(L) = 0.0D0
+20    CONTINUE
+      RETURN
+      END
+C
+C
+
+<a name="APPRX3360"</a>      DOUBLE PRECISION FUNCTION APPRX3(X0,Y0,Z0,NX,M,X,Y,Z,C)
+C
+C*****************************************************************
+C                                                                *
+C Evaluation FUNCTION for the interpolation                      *
+C                                                                *
+C INPUT PARAMETERS:                                              *
+C =================                                              *
+C X0,Y0,Z0 :  location where function is to be evaluated         *
+C NX       :  number of nodes                                    *
+C M        :  derivative order                                   *
+C X,Y,Z    :  NX-vectors ..(1:NX); the coordinates of the nodes  *
+C C        :  vector of coefficients C(1:(NX + M*(M+1)*(M+2)/6)) *
+C                                                                *
+C OUTPUT PARAMETER:                                              *
+C =================                                              *
+C APPRX3   :  Approximate value at (X0,Y0,Z0)                    *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C Required subroutines:  none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C Authors     : Richard Reuter (1983), Hartmut Turowski          *
+C Date        : 12.10.1989                                       *
+C Source      : FORTRAN 77                                       *
+C                                                                *
+C*****************************************************************
+C..
+C..   declarations
+C..
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DIMENSION X(NX),Y(NX),Z(NX),C(NX+(M*(M+1)*(M+2)/6))
+C..
+C..   for different M there are several cases:
+C..   1. M = 1, 2, 3 ; especially coded, fast
+C..   2. M > 3       ; each monomial is represented in the form
+C..                    (X**IX)*(Y**IY)*(Z**IZ), the evaluation is slow and
+C..                    rounding error prone.
+C..
+C..   the first polynomial is always  1
+C..
+      AP = C(NX+1)
+      IF (M .EQ. 1) GOTO 40
+      IF (M .EQ. 2) THEN
+C..
+C..   remaining monomials of degree  1
+C..
+            AP = AP + C(NX+2)*X0 + C(NX+3)*Y0 + C(NX+4)*Z0
+      ELSE IF (M .EQ. 3) THEN
+C..
+C..   remaining monomials of degree  2
+C..
+            AP = AP + (C(NX+2) + C(NX+5)*X0 + C(NX+6)*Y0)*X0
+     F              + (C(NX+3) + C(NX+8)*Y0 + C(NX+9)*Z0)*Y0
+     F              + (C(NX+4) + C(NX+7)*X0 +C(NX+10)*Z0)*Z0
+      ELSE
+C..
+C..   remaining monomials of degree &lt;= M-1
+C..
+         L = 1
+         DO 30 I = 1,M-1
+            DO 20 IX = I,0,-1
+               DO 10 IY = I-IX,0,-1
+                  IZ = I - IX -IY
+                  L = L+1
+                  IF (IX .NE. 0 .AND. IY .NE. 0 .AND. IZ .NE. 0) THEN
+                     AP = AP + C(NX+L)*(X0**IX)*(Y0**IY)*(Z0**IZ)
+                  ELSE IF (IX .NE. 0 .AND. IY .NE. 0) THEN
+                     AP = AP + C(NX+L)*(X0**IX)*(Y0**IY)
+                  ELSE IF (IX .NE. 0 .AND. IZ .NE. 0) THEN
+                     AP = AP + C(NX+L)*(X0**IX)*(Z0**IZ)
+                  ELSE IF (IY .NE. 0 .AND. IZ .NE. 0) THEN
+                     AP = AP + C(NX+L)*(Y0**IY)*(Z0**IZ)
+                  ELSE IF (IX .NE. 0) THEN
+                     AP = AP + C(NX+L)*(X0**IX)
+                  ELSE IF (IY .NE. 0) THEN
+                     AP = AP + C(NX+L)*(Y0**IY)
+                  ELSE
+                     AP = AP + C(NX+L)*(Z0**IZ)
+                  ENDIF
+10             CONTINUE
+20          CONTINUE
+30       CONTINUE
+      ENDIF
+40    CONTINUE
+C..
+C..   the G part of the system matrix
+C..
+C..   one might use the function E3(X,Y,Z) here, but this
+C..   would slow down the evaluation.
+C..   Hence this part is coded directly.
+C..
+      DO 50 I = 1, NX
+         R = (X(I)-X0)**2 + (Y(I)-Y0)**2 + (Z(I)-Z0)**2
+         AP = AP + C(I)*(DSQRT(R)**(2*M-3))
+50    CONTINUE
+      APPRX3 = AP
+      RETURN
+      END
+C
+C
+
+<a name="E3469"</a>      DOUBLE PRECISION FUNCTION E3(X,Y,Z,M)
+C
+C*****************************************************************
+C                                                                *
+C We evaluate the function F at (X,Y,Z).                         *
+C                                                                *
+C REMARK: the normalizing factors mentioned by MEINGUET [MEING79]*
+C         are not used as they turn out to be insignificant in   *
+C         the practical computations.                            *
+C                                                                *
+C                                                                *
+C INPUT PARAMETERS:                                              *
+C =================                                              *
+C X,Y,Z :  location where the evaluation takes place             *
+C                                                                *
+C M     :  derivative order                                      *
+C                                                                *
+C OUTPUT PARAMETER:                                              *
+C =================                                              *
+C E3    :  Functional value                                      *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C Required subroutines:  none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C Authors     : Richard Reuter (1983), Hartmut Turowski          *
+C Date        : 12.10.1989                                       *
+C Source      : FORTRAN 77                                       *
+C                                                                *
+C*****************************************************************
+C..
+C..   Compute the kernel function
+C..
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      R = DSQRT(X*X + Y*Y + Z*Z)
+      E3 = R**(2*M - 3)
+      RETURN
+      END
+</font>
+</pre>
+<a name="ende"</a>
+<hr>
+<a href="#anfang">Begin of file</a><br>
+<a href="../../inhalt.htm#fortra77kap12prob3for">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+</body>
+</html>

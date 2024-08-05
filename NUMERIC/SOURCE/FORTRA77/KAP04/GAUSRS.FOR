@@ -1,0 +1,93 @@
+C[BA*)
+C[LE*)
+C[LE*)
+C[LE*)
+C[FE{F 4.5.4}
+C[  {Gau"s Algorithm for Systems with Several Right Hand Sides}
+C[  {Gau"s Algorithm for Systems with Several Right Hand Sides}*)
+C[LE*)
+      SUBROUTINE GAUSRS(N,A,LDA,M,RS,XL,MARK,D,IPIVOT)
+C[IX{GAUSRS}*)
+C
+C*****************************************************************
+C                                                                *
+C  Solving a linear systems of equations  A * XL = RS  for M     *
+C  right hand sides using the Gauss-elimination method with      *
+C  scaling and column pivot search .                             *
+C  If the system has the form                                    *
+C         A * XL = I  , where I = identity matrix and A, XL, I   *
+C  are all (NxN) matrices, then the solution XL is the matrix    *
+C  inverse of A.                                                 *
+C[BE*)
+C                                                                *
+C                                                                *
+C  INPUT PARAMETER:                                              *
+C  ================                                              *
+C  N        : order of the system of equations.                  *
+C  A        : 2-dimensional array A(1:LDA,1:N), containing the   *
+C             LDAxN matrix A common to all M systems of equations*
+C             (A = A(ORG)).                                      *
+C  LDA      : leading dimension of A, RS and XL, as defined in   *
+C             the calling program.                               *
+C  M        : number of right hand sides and hence the number of *
+C             solution vectors.                                  *
+C  RS       : 2-dimensional array RS(1:LDA,1:M), that is formed  *
+C             with the M right hand sides as columns.            *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  ==================                                            *
+C  A        : 2-dimensional array A(1:LDA,1:N), containing the   *
+C             factors L and R with  P * A(ORG) = L * R. Here     *
+C             P = permutation matrix, L = unit lower triangular  *
+C             matrix and R = upper triangular matrix.            *
+C  XL       : 2-dimensional array XL(1:LDA,1:M) that contains    *
+C             the M solution vectors as columns for each of the  *
+C             M systems of equations.                            *
+C  MARK     : = 1, even number of row permutations.              *
+C             =-1, odd number of row permutations.               *
+C             = 0, input matrix A is numerically singular.       *
+C             The determinant of A is :                          *
+C                DET(A(ORG)) = MARK * A(1,1) * ... * A(N,N).     *
+C  D        : N-vector D(1:N); the reciprocals of the row sum    *
+C             norms of A(ORG), used for scaling:                 *
+C             D(I) = 1./(ABS(A(I,1)) + ... + ABS(A(I,N)))  for   *
+C             I = 1, ..., N.                                     *
+C  IPIVOT   : N-vector IPIVOT(1:N); it indicates the row per-    *
+C             mutations and thus defines the permutation matrix  *
+C             P. If e.g. IPIVOT(2) = 7, then the 7th row in      *
+C             of A(ORG) will become the 2nd row of P * A(ORG).   *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: GAUSSP, GAUSSS                          *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  authors   : Gisela Engeln-Muellges, Guido Dubois              *
+C  date      : 04.25.88                                          *
+C  source    : FORTRAN 77                                        *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DOUBLE PRECISION A(1:LDA,1:N),RS(1:LDA,1:M),XL(1:LDA,1:M),
+     +                 D(1:N)
+      INTEGER IPIVOT(1:N)
+C
+C  Factoring the matrix A by applying SUBROUTINE GAUSSP.
+C
+      CALL GAUSSP(N,A,LDA,IPIVOT,MARK,D)
+C
+C  Updating and bachsubstitution using SUBROUTINE GAUSSS in order to
+C  calculate the solution vectors for the M systems of equations.
+C
+      IF(MARK .NE. 0) THEN
+         DO 10 K=1,M
+            CALL GAUSSS(N,A,LDA,IPIVOT,RS(1,K),XL(1,K))
+   10    CONTINUE
+      END IF
+      RETURN
+      END

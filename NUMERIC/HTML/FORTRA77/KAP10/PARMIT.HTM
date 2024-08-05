@@ -1,0 +1,399 @@
+<html>
+<head>
+<title>fortra77/kap10/parmit.for</title>
+</head>
+<body>
+<a name="anfang"</a>
+<hr>
+<a href="#ende">End of file</a><br>
+<a href="../../inhalt.htm#fortra77kap10parmitfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+<font size=+2>
+<pre>
+
+
+
+</pre><u><h1>F 10.2.3  Parametric Hermite Splines</h1></u><pre>
+
+<a name="PARMIT9"</a>      SUBROUTINE PARMIT (N,MARG,X,Y,XDIREC,YDIREC,IDIREC,BCND1,
+     1                   BCNDN,AX,BX,CX,DX,EX,FX,AY,BY,CY,DY,EY,
+     2                   FY,T,IERR,XT,YT,SUP,DXT,AINF,PRC,AR1,
+     3                   AR2,AR3,H )
+C
+C*****************************************************************
+C                                                                *
+C     PARMIT computes the coefficients of a parametric hermite   *
+C     spline. The end point conditions can be specified via MARG.*
+C                                                                *
+C                                                                *
+C     INPUT PARAMETERS:                                          *
+C     =================                                          *
+C     N       number of nodes  (X(I),Y(I))                       *
+C     MARG    index for the endpoint condition:                  *
+C               MARG = 1 : Periodic spline                       *
+C               MARG = 2 : Natural spline                        *
+C               MARG = 3 : User specified second derivatives at  *
+C                          the end points.                       *
+C                          In this case the program expects that *
+C                           2    2                               *
+C                          D Y/DX ( X(1) ) is in BCND1(1)  and   *
+C                           2    2                               *
+C                          D Y/DX ( X(N) )  in BCNDN(1).         *
+C               MARG = 4 : The user specifies the second         *
+C                          derivative                            *
+C                          ..     ..                             *
+C                          SX(T), SY(T) of the component splines *
+C                          at the end points.                    *
+C                          In this case the program expects to   *
+C                          find                                  *
+C                          ..                                    *
+C                          SX( T(1) )  in BCND1(1)               *
+C                          ..                                    *
+C                          SY( T(1) )  in BCND1(2)               *
+C                          ..                                    *
+C                          SX( T(N) )  in BCNDN(1), and          *
+C                          ..                                    *
+C                          SY( T(N) )  in BCNDN(2).              *
+C               MARG = 5 : The user specifies the curvature radii*
+C                          R1, RN at the end points.             *
+C                          In this case the program expects      *
+C                          R1  in BCND1(1), and                  *
+C                          RN  in BCNDN(1).                      *
+C                          Re. concavity : If the radius is      *
+C                          positive, the curvature circle lies   *
+C                          to the left of the spline viewed in   *
+C                          direction of increasing parameter     *
+C                          values (concave to the left); if the  *
+C                          radius is negative, the spline is     *
+C                          concave to the right.                 *
+C               MARG = 6 : The user specifies the third          *
+C                          derivative                            *
+C                          ...    ...                            *
+C                          SX(T), SY(T) of the component splines *
+C                          at the end points.                    *
+C                          In this case the program expects to   *
+C                          find                                  *
+C                          ...                                   *
+C                          SX( T(1) )  in BCND1(1)               *
+C                          ...                                   *
+C                          SY( T(1) )  in BCND1(2)               *
+C                          ...                                   *
+C                          SX( T(N) )  in BCNDN(1), and          *
+C                          ...                                   *
+C                          SY( T(N) )  in BCNDN(2).              *
+C     X       ) vectors ..(1:N); the given nodes (X(I),Y(I)) for *
+C     Y       ) I = 1, ... , N.                                  *
+C     XDIREC  vector XDIR(1:N);                                  *
+C             X components of the tangent or normal vector at    *
+C             ( X(I),Y(I) ), I=1,...,N, if the user prescribes   *
+C             such.                                              *
+C             Otherwise: not used                                *
+C     YDIREC  vector YDIR(1:N);                                  *
+C             Y components of the tangent or normal vector at    *
+C             ( X(I),Y(I) ), I=1,...,N, the value of DY/DX(X(I)) *
+C             for I =1,...,N; see parameter IDIREC. If one of the*
+C             values exceeds 1.0D+38, the program assumes a      *
+C             vertical tangent there.                            *
+C     IDIREC  index for specifying tangent/normal vectors:       *
+C               IDIREC = 1 : Tangent vectors given               *
+C               IDIREC = 2 : Normal vectors given                *
+C               IDIREC = 3 : derivatives DY/DX(X(I)) given       *
+C             Refer to XDIREC and YDIREC.                        *
+C             NOTE: When prescribing tangent or normal vectors   *
+C                   please note:                                 *
+C                   a) the length of such a vector does not in-  *
+C                      fluence the spline, since these vectors   *
+C                      are normalized internally.                *
+C                   b) the normed tangent vector will be stored  *
+C                      for all values of IDIREC in XT (X-        *
+C                      components) and YT (Y-components).        *
+C     BCND1   )  vectors ..(1:2);                                *
+C     BCNDN   )  end point conditions as given by the user via   *
+C             )  MARG.                                           *
+C             )  not used if not prescribed by the user.         *
+C                                                                *
+C                                                                *
+C     OUTPUT PARAMETERS:                                         *
+C     ==================                                         *
+C     AX      )  vectors ..(1:N);                                *
+C     FX      )  the coefficients of the spline component SX(T)  *
+C             )                  .                               *
+C             )  for ( T(I),X(I),X(I) )                          *
+C                                                                *
+C     AY      )  vectors .. (1:N);                               *
+C     FY      )  the coefficients of the spline component SY(T)  *
+C             )                  .                               *
+C             )  for ( T(I),Y(I),Y(I) )                          *
+C                                                                *
+C     T       vector T(1:N); the parameter values T(I), I=1,...,N*
+C     IERR    error code.                                        *
+C               IERR = 0 : no error                              *
+C               IERR > 0 : error in input data, no output.       *
+C               Specifically:                                    *
+C               IERR = 1 : MARG &lt; 1  or  MARG > 6                *
+C               IERR = 2 : IDIREC &lt; 1  or  IDIREC > 3            *
+C               IERR = 3 : N &lt; 3                                 *
+C               IERR = 4 : If IDIREC=3: For one point we cannot  *
+C                          compute a meaningful tangent due to   *
+C                          contradicting input. This will occur  *
+C                          e.g. if three adjacent points are col-*
+C                          linear with the central tangent speci-*
+C                          fied perpendicular to this line.      *
+C               IERR = 5 : Two cosecutive points coincide:       *
+C                          X(I)=X(I+1) and Y(I)=Y(I+1) for one   *
+C                          index I. (Non consecutive identical   *
+C                          points such as self crossing curves   *
+C                          are, however allowed.)                *
+C               IERR = 6 : a tangent or normal vector is equal to*
+C                          the zero vector.                      *
+C                           2     2                              *
+C               IERR = 7 : D  Y/DX   was specified at the end-   *
+C                          points, but the spline has a vertical *
+C                          tangent at one end point, leading to  *
+C                          mathematical inconsistencies.         *
+C               IERR = 8 : One of the curvature radii is zero.   *
+C               IERR = 9 : A periodic spline was stipulated, but *
+C                          the data satisfies  X(1).NE.X(N).     *
+C               IERR =10 : A periodic spline was stipulated, but *
+C                          the data satisfies  Y(1).NE.Y(N).     *
+C                                                                *
+C                                                                *
+C     AUXILIARY PARAMETERS:                                      *
+C     =====================                                      *
+C     XT      ) auxiliary vectors ..(1:N);                       *
+C     YT      ) the vectors XT and YT will contain the normalized*
+C     SUP     ) tangent vectors, see IDIREC.                     *
+C     DXT     )                                                  *
+C     AINF    )                                                  *
+C     PRC     )                                                  *
+C     AR1     )                                                  *
+C     AR2     )                                                  *
+C     AR3     )                                                  *
+C     H       )                                                  *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  Subroutines required: HERMIT                                  *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author   : Elmar Pohl                                         *
+C  Date     : 09.28.1985                                         *
+C  Source   : FORTRAN 77                                         *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H, O-Z)
+      DOUBLE PRECISION X(N),Y(N),XDIREC(N),YDIREC(N),T(N),XT(N),YT(N)
+      DOUBLE PRECISION BCND1(2),BCNDN(2),SUP(N),DXT(N),AR1(N),AR2(N),
+     +                 AR3(N)
+      DOUBLE PRECISION AX(N),BX(N),CX(N),DX(N),EX(N),FX(N),H(N),PRC(N)
+      DOUBLE PRECISION AY(N),BY(N),CY(N),DY(N),EY(N),FY(N),AINF(N)
+      IERR=0
+      IF (MARG .GE. 1 .AND. MARG .LE. 6) GOTO 1
+         IERR=1
+         RETURN
+    1 IF (IDIREC .GE. 1 .AND. IDIREC .LE. 3) GOTO 2
+         IERR=2
+         RETURN
+    2 IF (N .GE. 3) GOTO 4
+         IERR=3
+         RETURN
+    4 T(1)=0.0D0
+      DO 6 I=2,N
+           DELTX=X(I)-X(I-1)
+           DELTY=Y(I)-Y(I-1)
+           DELT=DELTX*DELTX+DELTY*DELTY
+           IF(DELT .GT. 0.0D0) GOTO 5
+           IERR=5
+           RETURN
+    5      T(I)=T(I-1)+DSQRT(DELT)
+    6 CONTINUE
+      IF (IDIREC-2) 101,102,103
+  101    DO 19 I=1,N
+               XT(I)=XDIREC(I)
+               YT(I)=YDIREC(I)
+   19    CONTINUE
+         GOTO 104
+  102    DO 7 I=1,N
+              XT(I)=YDIREC(I)
+              YT(I)=-XDIREC(I)
+    7    CONTINUE
+         GOTO 104
+  103    DO 9 I=1,N
+              IF (DABS(YDIREC(I)) .GE. 1.0D38) GOTO 8
+                 XT(I)=1.0D0
+                 YT(I)=YDIREC(I)
+                 GOTO 9
+    8            XT(I)=0.0D0
+                 YT(I)=1.0D0
+    9    CONTINUE
+  104 CONTINUE
+C
+      DO 11 I=1,N
+            VLONG=DSQRT(XT(I)*XT(I)+YT(I)*YT(I))
+            IF (VLONG .GT. 0.0D0) GOTO 10
+               IERR=6
+               RETURN
+   10       XT(I)=XT(I)/VLONG
+            YT(I)=YT(I)/VLONG
+   11 CONTINUE
+      NM1=N-1
+      IF ( (X(2)-X(1))*XT(1)+(Y(2)-Y(1))*YT(1) ) 25,27,26
+   27 IF (IDIREC-3) 26,28,26
+   25 XT(1)=-XT(1)
+      YT(1)=-YT(1)
+   26 DO 12 I=1,NM1
+            IF ( (X(I+1)-X(I))*XT(I)+(Y(I+1)-Y(I))*YT(I) )
+     1                                               20,21,12
+   21       IF ( (X(I)-X(I-1))*XT(I)+(Y(I)-Y(I-1))*YT(I) )
+     1                                               20,29,12
+   29       IF (IDIREC-3) 12,28,12
+   20       XT(I)=-XT(I)
+            YT(I)=-YT(I)
+   12 CONTINUE
+      IF ( (X(N)-X(NM1))*XT(N)+(Y(N)-Y(NM1))*YT(N) ) 22,23,24
+   23 IF (IDIREC-3) 24,28,24
+   28 IERR=4
+      RETURN
+   22 XT(N)=-XT(N)
+      YT(N)=-YT(N)
+   24 GOTO (201,202,203,204,205,206),MARG
+  201      MARGH=1
+           GOTO 16
+  202      MARGH=2
+           GOTO 16
+  203      IF (XT(1) .NE. 0.0D0 .AND. XT(N) .NE. 0.0D0) GOTO 13
+              IERR=7
+              RETURN
+   13      RB1=1.0D0
+           RBN=1.0D0
+           GOTO 15
+  204      RB1=BCND1(1)
+           RBN=BCNDN(1)
+           GOTO 15
+  205      IF (BCND1(1) .NE. 0.0D0 .AND. BCNDN(1) .NE. 0.0D0) GOTO 14
+              IERR=8
+              RETURN
+   14      RB1=1.0D0
+           IF (XT(1) .EQ. 0.0D0) RB1=-1.0D0/BCND1(1)/YT(1)
+           RBN=1.0D0
+           IF (XT(N) .EQ. 0.0D0) RBN=-1.0D0/BCNDN(1)/YT(N)
+   15      MARGH=3
+           GOTO 16
+  206      MARGH=5
+           RB1=BCND1(1)
+           RBN=BCNDN(1)
+   16 IREP=0
+      CALL HERMIT(N,MARGH,T,X,XT,RB1,RBN,IREP,AX,BX,CX,DX,EX,FX
+     1             ,MORSH,H,SUP,AINF,PRC,DXT,AR1,AR2,AR3       )
+      IF (MARG .NE. 1 .OR. MORSH .NE. 4) GOTO 17
+         IERR=9
+         RETURN
+   17 GOTO (18,18,303,304,305,306),MARG
+  303      RB1=(XT(1)**3*BCND1(1)+YT(1))/XT(1)
+           RBN=(XT(N)**3*BCNDN(1)+YT(N))/XT(N)
+           GOTO 18
+  304      RB1=BCND1(2)
+           RBN=BCNDN(2)
+           GOTO 18
+  305      RB1=1.0D0
+           IF (XT(1) .NE. 0.0D0) RB1=(1.0D0/BCND1(1)+YT(1))/XT(1)
+           RBN=1.0D0
+           IF (XT(N) .NE. 0.0D0) RBN=(1.0D0/BCNDN(1)+YT(N))/XT(N)
+           GOTO 18
+  306      RB1=BCND1(2)
+           RBN=BCNDN(2)
+   18 IREP=1
+      CALL HERMIT(N,MARGH,T,Y,YT,RB1,RBN,IREP,AY,BY,CY,DY,EY,FY
+     1             ,MORSH,H,SUP,AINF,PRC,DXT,AR1,AR2,AR3       )
+      IF (MARG .EQ. 1 .AND. MORSH .EQ. 4) IERR=10
+      RETURN
+      END
+C
+C
+
+<a name="PMTVAL312"</a>      SUBROUTINE PMTVAL (N,T0,T,AX,BX,CX,DX,EX,FX,
+     1                   AY,BY,CY,DY,EY,FY,SX,SY,OUTP)
+C
+C*******************************************************************
+C                                                                  *
+C     PMTVAL computes functional values of a parametric hermite    *
+C     polynomial spline of fifth degree ( SX(T),SY(T) ) and its    *
+C     derivatives at T=T0.                                         *
+C     While this program could be used to obtain an equidistant    *
+C     table of values for the spline for graphing e.g., this is not*
+C     recommended, since PMTVAL performs an expensive interval     *
+C     search for each input T0. Moreover not all derivatives will  *
+C     generally be required.                                       *
+C     To make a table of values we recommend a program like PMTAB. *
+C                                                                  *
+C                                                                  *
+C     INPUT PARAMETERS:                                            *
+C     =================                                            *
+C     T0      value where we want to evaluate the spline           *
+C     N       number of parameter values T(I)                      *
+C     T       vector T(1:N); parameter values of the splines,      *
+C             as computed by the SUBROUTINE PARMIT for example.    *
+C     AX      )                                                    *
+C     BX      )  vectors ..(1:N);                                  *
+C     CX      )  the coefficients of the spline component SX       *
+C     DX      )                                                    *
+C     EX      )                                                    *
+C     FX      )                                                    *
+C                                                                  *
+C     AY      )                                                    *
+C     BY      )  vectors .. (1:N);                                 *
+C     CY      )  the coefficients of the spline component SX       *
+C     DY      )                                                    *
+C     EY      )                                                    *
+C     FY      )                                                    *
+C                                                                  *
+C                                                                  *
+C     OUTPUT PARAMETERS:                                           *
+C     ==================                                           *
+C     SX      SX = SX(T0)                                          *
+C     SY      SY = SY(T0)                                          *
+C     OUTP    2-dimensional array OUTP(1:5,1:2) for the derivatives*
+C                           (K)                                    *
+C             OUTP(K,1) = SX    (T0)                               *
+C                           (K)                                    *
+C             OUTP(K,2) = SY    (T0),  K=1(1)5                     *
+C                                                                  *
+C------------------------------------------------------------------*
+C                                                                  *
+C  Subroutines required: HMTVAL                                    *
+C                                                                  *
+C*******************************************************************
+C                                                                  *
+C  Author   : Elmar Pohl                                           *
+C  Date     : 28.09.1985                                           *
+C  Source   : FORTRAN 77                                           *
+C                                                                  *
+C*******************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H, O-Z)
+      DOUBLE PRECISION T(N),AX(N),BX(N),CX(N),DX(N),EX(N),FX(N),AY(N)
+      DOUBLE PRECISION BY(N),CY(N),DY(N),EY(N),FY(N),AUSG(5),OUTP(5,2)
+      DOUBLE PRECISION HMTVAL
+      SX=HMTVAL(N,T0,AX,BX,CX,DX,EX,FX,T,AUSG)
+      DO 10 I=1,5
+         OUTP(I,1)=AUSG(I)
+   10 CONTINUE
+      SY=HMTVAL(N,T0,AY,BY,CY,DY,EY,FY,T,AUSG)
+      DO 20 I=1,5
+         OUTP(I,2)=AUSG(I)
+   20 CONTINUE
+      RETURN
+      END
+</font>
+</pre>
+<a name="ende"</a>
+<hr>
+<a href="#anfang">Begin of file</a><br>
+<a href="../../inhalt.htm#fortra77kap10parmitfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+</body>
+</html>

@@ -1,0 +1,1266 @@
+C[BA*)
+C[LE*)
+C[LE*)
+C[LE*)
+C[FE{F 4.17}
+C[  {The Cuthill-McKee Algorithm}
+C[  {The Algorithm of Cuthill-McKee for Sparse Symmetric
+C[   Matrices}*)
+C[LE*)
+      SUBROUTINE CUTCHO (FMAT, FRS, FSOL, MAXELM, MAXROW, MAXAP,
+C[IX{CUTCHO}*)
+     +                   M, IFLAG, V, IC, IR, NEIGHB, INB, LEVEL,
+     +                   ILV, IDEG, ICM, ICMREV, MARK, RSORG, RS,
+     +                   X, AP, Z)
+C
+C*****************************************************************
+C                                                                *
+C  CUTCHO solves a linear system with a sparse and symmetric     *
+C  positive definite system matrix using the Cuthill-McKee       *
+C  algorithm and the Cholesky decomposition.                     *
+C[BE*)
+C                                                                *
+C  The nonzero elements of the system matrix are  read in        *
+C  from the data file FMAT. The Cuthill-McKee method then trans- *
+C  forms the matrix to one with band structure of minimal band   *
+C  width.                                                        *
+C  The upper half band of this symmetric matrix is then condensed*
+C  and the resulting matrix is factored using a Cholesky method  *
+C  for condensed symmetric band matrices (SUBROUTINE CHOBDZ).    *
+C  After CHOBDZ, the right hand sides are read from the data set *
+C  FRS and solution vectors are found using CHOBDL. The solutions*
+C  are stored in the data set FSOL.                              *
+C                                                                *
+C  If the given system matrix is not positive definite, its      *
+C  Cholesky decomposition will be obtainable and thus the        *
+C  SUBROUTINE CUTCHO cannot be used. In this case we recommend   *
+C  using CUTGAU which used a version of the Gauá algorithm for   *
+C  condensed matrices with partial pivoting that, however, uses  *
+C  more operations and three times the storage of CUTCHO.        *
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  FMAT   : CHAR*(*): Name of the input file of the nonzero      *
+C           matrix elements                                      *
+C           This data file is structured as follows:             *
+C           - number of rows of the matrix                       *
+C           - row wise:                                          *
+C             - for every nonzero entry we store the tupel of    *
+C               <column index> <entry>                           *
+C               (indices start with 1)                           *
+C             - a tupel with column index 0 designates the end of*
+C               the row data                                     *
+C  FRS    : CHAR*(*): Name of the input file for the right hand  *
+C           sides in the form:                                   *
+C           - number of right hand sides                         *
+C           - for each right hand side:                          *
+C             the entries appear in consecutive rows             *
+C  FSOL   : CHAR*(*): Name of the output file for the solutions. *
+C           It has the form:                                     *
+C           - number of solutions (= number of right hand sides) *
+C           - for each solution:                                 *
+C             the entries appear in consecutive rows.            *
+C  MAXELM : Dimensioning number for arrays, that will contain    *
+C           matrix elements. MAXELM must be at least equal to the*
+C           number of nonzero matrix elements.                   *
+C  MAXROW : Dimensioning number for auxiliary arrays.            *
+C           MAXROW must be at least as large as the number of    *
+C           matrix rows.                                         *
+C  MAXAP  : Upper index bound of vector AP                       *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  ==================                                            *
+C  M      : Number of upper or lower nonzero codiagonals of the  *
+C           condensed matrix                                     *
+C  IFLAG  : error parameter:                                     *
+C               1: no error                                      *
+C           .NE.1: the matrix is numerically singular or not     *
+C                  positive definite                             *
+C                                                                *
+C                                                                *
+C  AUXILIARY PARAMETERS:                                         *
+C  =====================                                         *
+C  V      : vector V(1:MAXELM), Matrix in a linear list          *
+C  IC     : vector IC(1:MAXELM), column indices of elements in V *
+C  IR     : vector IR(1:MAXROW), starting indices of the rows of *
+C           V                                                    *
+C  NEIGHB : vector NEIGHB(1:MAXELM), incidence graph in a linear *
+C           list                                                 *
+C  INB    : vector INB(1:MAXROW), pointer for sublists in NEIGHB *
+C  LEVEL  : vector LEVEL(1:MAXROW), level structure of a graph   *
+C  ILV    : vector ILV(1:MAXROW), pointer for the levels in LEVEL*
+C  IDEG   : vector IDEG(1:MAXROW), order of the nodes in the     *
+C           graph                                                *
+C  ICM    : vector ICM(1:MAXROW), Cuthill-McKee numbering        *
+C  ICMREV : vector ICMREV(1:MAXROW), inverse permutation of ICM  *
+C  MARK   : LOGICAL MARK(1:MAXROW), marks nodes                  *
+C  RSORG  : vector RSORG(1:MAXROW), one right hand side          *
+C  RS     : vector RS(1:MAXROW), RSORG after the Cuthill-McKee   *
+C           permutation                                          *
+C  X      : vector X(1:MAXROW), the solution still to be permuted*
+C  AP     : vector AP(1:MAXROW*(M+1)), upper band of the         *
+C           transformed matrix in condensed form.                *
+C           M is the number of upper codiagonals of the condensed*
+C           matrix. This number is found when performing the     *
+C           Cuthill-McKee numbering scheme, hence M is not known *
+C           before the program is run. Estimates exist in the    *
+C           literature.                                          *
+C  Z      : auxiliary vector IP(1:MAXROW) used in CHOBDZ         *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  Required subroutines:                                         *
+C                                                                *
+C  RDMTRX  reads matrix from input file into arrays              *
+C  BLDGPH  constructs the incidence graph of the matrix          *
+C  CUTHIL  computes the Cuthill-McKee permutation                *
+C  CUTH1K  Cuthill-McKee numbering for one component of the graph*
+C  FNDROO  searches for starting nodes for the optimal level     *
+C          structure                                             *
+C  LVSTRU  constructs level structure of one component of the    *
+C          graph                                                 *
+C  SRTDEG  sorts nodes by their level                            *
+C  IBDWID  computes half the band width of the condensed matrix  *
+C  CUTPAK  forms condensed band matrix for SUBROUTINE CHOBDZ     *
+C  PERMUT  permutes the elements of a vector                     *
+C  CHOBDZ  decomposes a condensed band matrix using Cholesky     *
+C  CHOBDL  solves a linear system given in CHOBDZ factorization  *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author    : Elmar Pohl                                        *
+C  Date      : 11.17.1991                                        *
+C  Source    : FORTRAN 77                                        *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+C
+      INTEGER IC(MAXELM), IR(MAXROW), NEIGHB(MAXELM), INB(MAXROW)
+      INTEGER LEVEL(MAXROW), ILV(MAXROW)
+      INTEGER IDEG(MAXROW), ICM(MAXROW), ICMREV(MAXROW)
+      LOGICAL MARK(MAXROW)
+      DIMENSION V(MAXELM), RSORG(MAXROW), RS(MAXROW)
+      DIMENSION X(MAXROW), Z(MAXROW), AP(*)
+      CHARACTER*(*) FMAT, FRS, FSOL
+C
+      PARAMETER (IFRS=8, IFSOL=9)
+C
+      NROW = 0
+      NV = 0
+      NLV = 0
+C
+C     Read in matrix
+C
+      CALL RDMTRX (FMAT, MAXELM, MAXROW, NROW, NV, V, IC, IR)
+C
+C     Construct the incidence gragh of the matrix
+C
+      CALL BLDGPH (NROW, IC, IR, NEIGHB, INB, IDEG)
+C
+C     Find the CUTHILL-MCKEE permutation
+C
+      CALL CUTHIL (NROW, NEIGHB, INB, IDEG, ICM,
+     +             ICMREV, MARK, LEVEL, ILV)
+C
+C     Find half the bandwidth of the transformed matrix
+C
+      M = IBDWID (NROW, NEIGHB, INB, ICM, ICMREV)
+      if (nrow * m .gt. maxap) then
+        write (*,*) 'CUTCHO: AP too small for condensed matrix!'
+        stop
+      end if
+C
+C     prevent the new permutation from increasing the band width
+C
+      call ckbdwd(nrow, neighb, inb, m, icm, icmrev)
+C
+C     Condense the matrix for Cholesky
+C
+      CALL CUTPAK (NROW, M, V, IR, IC, ICMREV, AP)
+C
+C     Cholesky decomposition
+C
+      CALL CHOBDZ (NROW, M, AP, JFLAG, Z)
+      IFLAG = JFLAG
+      IF (IFLAG .NE. 1) RETURN
+C
+C     open the data file FRS, prepare to read in right hand sides
+C
+      OPEN (UNIT=IFRS, FILE=FRS)
+      READ (IFRS, *) NRS
+C
+C     open the data set FSOL for the solution vectors
+C
+      OPEN (UNIT=IFSOL, FILE=FSOL)
+      WRITE (IFSOL, '(1X,I5)') NRS
+C
+C     Loop for all right hand sides
+C
+      DO 10 IRS = 1, NRS
+C
+C        Read in the  IRS-th right hand side
+C
+         READ (IFRS,*) (RSORG(I), I=1,NROW)
+C
+C        Permute right hand side according to Cuthill-McKee permutaion
+C
+         CALL PERMUT (NROW, ICMREV, RSORG, RS)
+C
+C        Solve linear system
+C
+         CALL CHOBDL (NROW, M, AP, RS, X, Z)
+C
+C        Write solution onto output data file
+C
+         DO 30 I = 1, NROW
+            WRITE (IFSOL, '(1X,D17.10)') X(ICMREV(I))
+   30    CONTINUE
+   10 CONTINUE
+C
+      CLOSE (IFRS)
+      CLOSE (IFSOL)
+C
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE CUTHIL (NNODES, NEIGHB, INB, IDEG,
+C[IX{CUTHIL}*)
+     +                   ICM, ICMREV, MARK, LEVEL, ILV)
+C
+C*****************************************************************
+C                                                                *
+C  CUTHIL computes the Cuthill-McKee numbering of a graph.       *
+C  This Cuthill-McKee numbering is used to solve linear syatems  *
+C  with sparse and symmetric system matrices and saves storage   *
+C  space and computation al time. When using the Cuthill-McKee   *
+C  permutation on the graph of a symmetric matrix, the matrix is *
+C  transformed into a symmetric band matrix with a generally     *
+C  reduced bandwidth.                                            *
+C[BE*)
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  NNODES : number of nodes of the graph. The graph is determined*
+C           by the following two vectors:                        *
+C  NEIGHB : vector NEIGHB(1:*), the list of adjacent nodes.      *
+C           For I=1, ..., NNODES, the vector NEIGHB contains the *
+C           numbers of adjacent nodes of node I in positions     *
+C           NEIGHB(K) where K=INB(I), ..., INB(I+1)-1.           *
+C  INB    : vector INB(1:NNODES+1) containing the indices for    *
+C           NEIGHB.                                              *
+C           INB(NNODES+1) must be equal to the number of entries *
+C           in NEIGHB plus 1.                                    *
+C  IDEG   : vector IDEG(1:NNODES), containing the degree of every*
+C           node, i.e., the number of its neighbors.             *
+C                                                                *
+C  The vectors  NEIGHB, INB and IDEG can be formed from A by     *
+C  using SUBROUTINE BLDGPH.                                      *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  ==================                                            *
+C  ICM    : vector ICM(1:NNODES) containing the permutations of  *
+C           the nodes according to Cuthill-McKee. For I=1, ...,  *
+C           NNODES,  ICM(I)  describes the original index of the *
+C           node, while I is its Cuthill-McKee number            *
+C  ICMREV : vector ICMREV(1:NNODES), the inverse permutation of  *
+C           ICM: For I=1(1)NNODES, ICMREV(I) denotes the Cuthill-*
+C           McKee number of the node originally numbered I.      *
+C                                                                *
+C  REMARK:                                                       *
+C        One of the permutation vectors ICM or ICMREV is clearly *
+C        redundant. One can form the transformed matrix          *
+C        completely from ICM. However, if one wants to condense  *
+C        the transformed matrix, one would have to conduct       *
+C        expensive searches inside ICM, unless one has its       *
+C        inverse ICMREV available.                               *
+C                                                                *
+C                                                                *
+C  AUXILIARY VECTORS:                                            *
+C  ==================                                            *
+C  MARK   : LOGICAL MARK(1:NNODES) for labelling nodes           *
+C  LEVEL  : vector LEVEL(1:NNODES) for denoting the level        *
+C           structure of one component of the graph              *
+C  ILV    : vector ILV(1:NNODES) containing the starting indices *
+C           of levels in the vector LEVEL                        *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  Required subroutines:                                         *
+C                                                                *
+C  FNDROO   searches for starting nodes for an optimal level     *
+C           structure                                            *
+C  CUTH1K   Cuthill-McKee numbering of one component of the graph*
+C  LVSTRU   constructs the level structure of graph component    *
+C  SRTDEG   sorts nodes according to degree                      *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author    : Elmar Pohl                                        *
+C  Date      : 11.17.1991                                        *
+C  Source    : FORTRAN 77                                        *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+      INTEGER NEIGHB(*), INB(1:NNODES+1), IDEG(1:NNODES)
+      INTEGER ICM(1:NNODES), ICMREV(1:NNODES)
+      INTEGER LEVEL(1:NNODES), ILV(1:NNODES)
+      LOGICAL MARK(1:NNODES)
+
+      DO 10 I = 1, NNODES
+         MARK(I) = .FALSE.
+         ICM(I) = 0
+   10 CONTINUE
+      NFOUND = 0
+      DO 20 I = 1, NNODES
+         IF (.NOT. MARK(I)) THEN
+C
+C           Start of a new component in the graph
+C
+            IROOT = I
+C
+C           Search a starting node that will give a level structure of
+C           maximal length
+C
+            CALL FNDROO (IROOT, NNODES, NEIGHB,
+     +                   INB, IDEG, MARK, NLV, LEVEL, ILV, LNODES)
+C
+C           Cuthill-McKee numbering of this component
+C
+            CALL CUTH1K (IROOT, NFOUND + 1, NNODES,
+     +                   NEIGHB, INB, IDEG, MARK, ICM)
+            NFOUND = NFOUND + LNODES
+         END IF
+   20 CONTINUE
+C
+C     All components of the graph have been numbered.
+C     Form the inverse ICMREV of ICM
+C
+      DO 30 I = 1, NNODES
+         ICMREV(ICM(I)) = I
+   30 CONTINUE
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE CUTH1K (IROOT, ISTART, NNODES,
+C[IX{CUTH1K}*)
+     +                   NEIGHB, INB, IDEG, MARK, ICM)
+C[BE*)
+C
+C*****************************************************************
+C                                                                *
+C  Subroutine for the Cuthill-McKee algorithm.                   *
+C  It determines the component induced by the node IROOT together*
+C  with its  Cuthill-McKee numbering.                            *
+C                                                                *
+C  In order to find the Cuthill-McKee numbering of a graph, one  *
+C  calls CUTHIL and not CUTH1K. CUTHIL in turn calls CUTH1K      *
+C  repeatedly until all components of the graph have been found. *
+C  Hence  CUTHIL will work equally well for disconnected graphs. *
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  IROOT  : Number of the starting node                          *
+C           (output of SUBROUTINE FNDROO())                      *
+C  ISTART : Starting index for the Cuthill-McKee numbering of the*
+C           new component                                        *
+C  NNODES : Number of nodes of the graph. The graph is stored in *
+C           the two vectors below:                               *
+C  NEIGHB : vector NEIGHB(1:*), the list of adjacent nodes.      *
+C           For I=1, ..., NNODES, the vector NEIGHB contains the *
+C           numbers of adjacent nodes of node I in positions     *
+C           NEIGHB(K) where K=INB(I), ..., INB(I+1)-1.           *
+C  INB    : vector INB(1:NNODES+1) containing the indices for    *
+C           NEIGHB.                                              *
+C           INB(NNODES+1) must be equal to the number of entries *
+C           in NEIGHB plus 1.                                    *
+C  IDEG   : vector IDEG(1:NNODES), containing the degree of every*
+C           node, i.e., the number of its neighbors.             *
+C  MARK   : LOGICAL MARK(1:NNODES), node markers.                *
+C           If MARK(I)=.FALSE., then the node labelled I can be  *
+C           used in the new component. Otherwise it belongs to   *
+C           another componentn from an earlier call of CUTH1K.   *
+C                                                                *
+C  The vectors  NEIGHB, INB and IDEG can be formed by using      *
+C  SUBROUTINE BLDGPH.                                            *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  ==================                                            *
+C  ICM    : vector ICM(1:NNODES) containing the permutations of  *
+C           the nodes according to Cuthill-McKee. For I=1, ...,  *
+C           NNODES,  ICM(I)  describes the original index of the *
+C           node, while I is its Cuthill-McKee number            *
+C           The entries for I=ISTART, ..., ISTART+NNEW-1  are    *
+C           adjusted when calling CUTH1K, where NNEW denotes the *
+C           number of nodes of the new component.                *
+C  MARK   : same as on input, except that the indices of nodes in*
+C           the new component are now labelled .TRUE. .          *
+C                                                                *
+C  By successively calling  CUTH1K  for increasing values of     *
+C  ISTART, all positions in ICM and MARK are set.                *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  Required subroutines:                                         *
+C                                                                *
+C  SRTDEG   sorts nodes according to degree                      *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author    : Elmar Pohl                                        *
+C  Date      : 11.17.1991                                        *
+C  Source    : FORTRAN 77                                        *
+C                                                                *
+C*****************************************************************
+C
+      INTEGER NEIGHB(*), INB(1:NNODES+1), IDEG(1:NNODES)
+      INTEGER ICM(1:NNODES)
+      LOGICAL MARK(1:NNODES)
+C
+C     The method is similar to the algorithm for finding the
+C     level structure. This level structure is formed in the
+C     vector ICM. In addition we also make lists of nodes
+C     (ordered by degree) that are appended to existing level sets.
+C
+      ICM(ISTART) = IROOT
+      MARK(IROOT) = .TRUE.
+
+      NEWEND = ISTART
+C
+C     NEWEND denotes the final node of a component
+C     while it is being formed
+C
+      LEVEND = ISTART - 1
+   10 CONTINUE
+         LEVBEG = LEVEND + 1
+         LEVEND = NEWEND
+C
+C        LEVBEG denotes the start of the last level in ICM(),
+C        LEVEND marks the end.
+C
+C        Find nodes of the next level:
+C        search for nodes adjacent to lower level nodes
+C        and enter them in ICM in case they have not been
+C        marked .TRUE. before.
+C
+         DO 20 I = LEVBEG, LEVEND
+C
+C           Find a list of unmarked neighbors of the
+C           node originally labelled by ICM(I).
+C
+            NEWBEG = NEWEND + 1
+C
+C           ICM is the starting index of this list
+C
+            DO 30 J = INB(ICM(I)), INB(ICM(I) + 1) - 1
+               IF (.NOT. MARK(NEIGHB(J))) THEN
+                  NEWEND = NEWEND + 1
+                  ICM(NEWEND) = NEIGHB(J)
+                  MARK(NEIGHB(J)) = .TRUE.
+               END IF
+   30       CONTINUE
+C
+C           Sort ICM(NEWBEG), ..., ICM(NEWEND) by increasing degree
+C
+            CALL SRTDEG (ICM, IDEG, NEWBEG, NEWEND)
+   20    CONTINUE
+C
+C     Stay inside this loop as long as new nodes are being found.
+C
+      IF (NEWEND .GT. LEVEND) GOTO 10
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE BLDGPH (NROW, IC, IR, NEIGHB, INB, IDEG)
+C[IX{BLDGPH}*)
+C[BE*)
+C
+C*****************************************************************
+C                                                                *
+C  Subroutine for the Cuthill-McKee method.                      *
+C  Form the graph of a symmetric matrix.                         *
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  NROW   : number of rows                                       *
+C  IC     : vector IC(1:NV) with the column indices of the       *
+C           nonzero matrix entries                               *
+C           (NV = number of nonzero matrix entries)              *
+C  IR     : vector IR(1:NROW+1) with the indices for the         *
+C           beginnings of rows. IR(NROW+1) must equal NV+1.      *
+C                                                                *
+C  All inputs are available as outputs of SUBROUTINE RDMTRX.     *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  ==================                                            *
+C  NEIGHB : vector NEIGB(1:NV-NROW) with the indices of adjacent *
+C           nodes.                                               *
+C           Each row I corresponds to node I. If I.NE.K, then    *
+C           node I is adjacent to node K provided A(I,K).NE.0.   *
+C           Since the system matrix is assumed symmetric, if I   *
+C           is adjacent to K, so is K to I.                      *
+C           For I=1, ..., NROW, the vector NEIGHB contains the   *
+C           indices of adjacent nodes for node I from index      *
+C           INB(I) to index  INB(I+1)-1).                        *
+C  INB    : vector INB(1:NROW+1) with indices for the vector     *
+C           NEIGHB.                                              *
+C           For I=1, ..., NROW, INB(I) denotes the starting      *
+C           index of the list of adjacent nodes for I in NEIGHB. *
+C           This list extends to index INB(I+1)-1. We always have*
+C           INB(NROW+1) = NV-NROW+1.                             *
+C  IDEG   : vector IDEG(1:NROW) which specifies the degree of    *
+C           each node I=1, ..., NROW, i.e., the number of nodes  *
+C           adjacent to node I.                                  *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  Required subroutines: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author    : Elmar Pohl                                        *
+C  Date      : 11.17.1991                                        *
+C  Source    : FORTRAN 77                                        *
+C                                                                *
+C*****************************************************************
+C
+      INTEGER IC(*), IR(1:NROW+1), NEIGHB(*)
+      INTEGER INB(1:NROW+1), IDEG(1:NROW)
+C
+      N = 0
+      DO 10 I = 1, NROW
+         INB(I) = N + 1
+         DO 20 K = IR(I), IR(I + 1) - 1
+               IF (IC(K) .NE. I) THEN
+                  N = N + 1
+                  NEIGHB(N) = IC(K)
+               END IF
+   20    CONTINUE
+         IDEG(I) = N + 1 - INB(I)
+   10 CONTINUE
+      INB(NROW + 1) = N + 1
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE CUTPAK (N, M, V, IR, IC, ICMREV, AP)
+C[IX{CUTPAK}*)
+C[BE*)
+C
+C*****************************************************************
+C                                                                *
+C  Subroutine for solving a linear system via  Cuthill-McKee     *
+C  and Cholesky.                                                 *
+C  CUTPAK performs the Cuthill-McKee permutation specified in ICM*
+C  for the matrix that is given in  V, IR and IC and condenses   *
+C  the upper band of the resulting symmetric matrix in the array *
+C  AP.                                                           *
+C  This array AP can subsequently be used to solve linear systems*
+C  using the  SUBROUTINE CHOBND/CHOBDZ/CHOBDL.                   *
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  N      : number of rows of the matrix                         *
+C  M      : number of upper codiagonals after  Cuthill-McKee     *
+C           permutation                                          *
+C  V      : vector V(1:*), which contains the nonzero elements of*
+C           the matrix row after row                             *
+C  IC     : vector IC(1:*) of column indices for each entry in V *
+C  IR     : vector IR(1:N+1), containing the starting index for  *
+C           each row in V or IC. We must have                    *
+C               IR(N+1) =  1 + number of entries in V .          *
+C  ICMREV : vector ICMREV(1:N), the inverse permutation of the   *
+C           Cuthill-McKee numbering ICM. For I=1, ..., N,        *
+C           ICMREV(I) denotes the Cuthill-McKee number of the    *
+C           node with the original index I.                      *
+C                                                                *
+C  N,V,IR and IC are outputs of SUBROUTINE RDMTRX.               *
+C  M is an output of FUNCTION IBDWID.                            *
+C  ICMREV is an output of SUBROUTINE CUTHIL.                     *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETER:                                             *
+C  =================                                             *
+C  AP     : array AP(1:N,1:M+1), the condensed matrix            *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  Required subroutines: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author    : Elmar Pohl                                        *
+C  Date      : 11.17.1991                                        *
+C  Source    : FORTRAN 77                                        *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+C
+      DIMENSION V(*), AP(1:N,*)
+      INTEGER IC(*), IR(*), ICMREV(*)
+C
+      DO 10 I = 1, N
+         DO 20 K = 1, M + 1
+            AP(I, K) = 0.0D0
+   20    CONTINUE
+   10 CONTINUE
+C
+      DO 30 I = 1, N
+         IREV = ICMREV(I)
+         DO 40 K = IR(I), IR(I + 1) - 1
+            KREV = ICMREV(IC(K))
+            IF (KREV .GE. IREV)  AP(IREV, KREV - IREV + 1) = V(K)
+   40    CONTINUE
+   30 CONTINUE
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE CUTPK2 (N, M, V, IR, IC, ICMREV, AP)
+C[IX{CUTPK2}*)
+C[BE*)
+C
+C*****************************************************************
+C                                                                *
+C  Subroutine for solving a linear system via  Cuthill-McKee     *
+C  and Gauá.                                                     *
+C  CUTPK2 performs the Cuthill-McKee permutation specified in ICM*
+C  for the matrix that is given in  V, IR and IC and condenses   *
+C  the upper band of the resulting symmetric matrix in the array *
+C  AP.                                                           *
+C  This array AP can subsequently be used to solve linear systems*
+C  using the  SUBROUTINE BAND/BANDP/BANDS.                       *
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  N      : number of rows of the matrix                         *
+C  M      : number of upper codiagonals after  Cuthill-McKee     *
+C           permutation                                          *
+C  V      : vector V(1:*), which contains the nonzero elements of*
+C           the matrix row after row                             *
+C  IC     : vector IC(1:*) of column indices for each entry in V *
+C  IR     : vector IR(1:N+1), containing the starting index for  *
+C           each row in V or IC. We must have                    *
+C               IR(N+1) =  1 + number of entries in V .          *
+C  ICMREV : vector ICMREV(1:N), the inverse permutation of the   *
+C           Cuthill-McKee numbering ICM. For I=1, ..., N,        *
+C           ICMREV(I) denotes the Cuthill-McKee number of the    *
+C           node with the original index I.                      *
+C                                                                *
+C  N,V,IR and IC are outputs of SUBROUTINE RDMTRX.               *
+C  M is an output of FUNCTION IBDWID.                            *
+C  ICMREV is an output of SUBROUTINE CUTHIL.                     *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETER:                                             *
+C  =================                                             *
+C  AP     : array AP(1:N,1:M+1), the condensed matrix            *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  Required subroutines: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author    : Elmar Pohl                                        *
+C  Date      : 11.17.1991                                        *
+C  Source    : FORTRAN 77                                        *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+C
+      DIMENSION V(*), AP(1:N,*)
+      INTEGER IC(*), IR(*), ICMREV(*)
+C
+      DO 10 I = 1, N
+         DO 20 K = 1, 2*M + 1
+            AP(I, K) = 0.0D0
+   20    CONTINUE
+   10 CONTINUE
+C
+      DO 30 I = 1, N
+         IREV = ICMREV(I)
+         DO 40 K = IR(I), IR(I + 1) - 1
+            AP(IREV, M + 1 + ICMREV(IC(K)) - IREV) = V(K)
+   40    CONTINUE
+   30 CONTINUE
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE FNDROO (IROOT, NNODES, NEIGHB, INB,
+C[IX{FNDROO}*)
+     +                   IDEG, MARK, NLV, LEVEL, ILV, LNODES)
+C
+C*****************************************************************
+C                                                                *
+C  Subroutine for the Cuthill-McKee algorithm.                   *
+C  It constructs the level structure of the component of the     *
+C  graph of IROOT and attempts to choose a starting node so that *
+C  the resulting structure will have as many levels as possible. *
+C[BE*)
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  IROOT  : Number of the node that defines the component        *
+C  NNODES : Number of nodes of the graph. The graph is defined by*
+C           the following two vectors:                           *
+C  NEIGHB : vector NEIGHB(1:*) with the lists of adjacent nodes  *
+C           For I=1, ..., NNODES, the vector NEIGHB contains the *
+C           indices of the nodes that are adjacent to node I in  *
+C           NEIGHB(K) for  K=INB(I), ...,  INB(I+1)-1.           *
+C  INB    : vector INB(1:NNODES+1) with indices for the sublists *
+C           in NEIGHB. We must have that                         *
+C             INB(NNODES+1) = 1 + number of elements in NEIGHB . *
+C  IDEG   : vector IDEG(1:NNODES) of degrees of the nodes        *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  ==================                                            *
+C  IROOT  : new starting node                                    *
+C  NLV    : number of levels                                     *
+C  LEVEL  : vector LEVEL(1:NNODES) listing nodes of identical    *
+C           level. For I=1, ..., NLV, the vector LEVEL contains  *
+C           the indices of the nodes of level I in positions     *
+C           LEVEL(K) for  K = ILV(I), ..., ILV(I+1)-1.           *
+C  ILV    : vector ILV(1:NLV+1) with indices for the level list  *
+C           LEVEL(). We must have  ILV(NLV+1) = 1 + number of    *
+C           entries in LEVEL .  If the graph is connected, this  *
+C           number is equal to  NNODES + 1.                      *
+C  LNODES : number of nodes in the component                     *
+C                                                                *
+C                                                                *
+C  AUXILIARY PARAMETER:                                          *
+C  ====================                                          *
+C  MARK   : LOGICAL MARK(1:NNODES), marking some nodes           *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  Required subroutines:                                         *
+C                                                                *
+C  LVSTRU    determines the level structure of one component of  *
+C            the graph                                           *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author    : Elmar Pohl                                        *
+C  Date      : 11.17.1991                                        *
+C  Source    : FORTRAN 77                                        *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+      INTEGER NEIGHB(*), INB(*), IDEG(*), LEVEL(*), ILV(*)
+      LOGICAL MARK(*)
+C
+      NLVOLD = 0
+   10 CONTINUE
+         CALL LVSTRU (IROOT, NNODES, NEIGHB, INB,
+     +                MARK, NLV, LEVEL, ILV, LNODES)
+C
+C        This is the exit from the loop
+C
+         IF (NLV .LE. NLVOLD) RETURN
+C
+         NLVOLD = NLV
+C
+C        Search for node of minimal degree in the previous level
+C
+         IMIN = ILV(NLV)
+         IDGMIN = IDEG(LEVEL(IMIN))
+         DO 20 I = ILV(NLV) + 1, ILV(NLV + 1) - 1
+            IF (IDEG(LEVEL(I)) .LT. IDGMIN) THEN
+               IMIN = I
+               IDGMIN = IDEG(LEVEL(I))
+            END IF
+   20    CONTINUE
+C
+C        Use this node as a start to construct
+C        the level structure
+C
+         IROOT = LEVEL(IMIN)
+      GOTO 10
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      INTEGER FUNCTION IBDWID (NNODES, NEIGHB, INB, NOLD, NNEW)
+C[IX{IBDWID}*)
+C[BE*)
+C
+C*****************************************************************
+C                                                                *
+C  Subroutine for the Cuthill-McKee algorithm.                   *
+C  It determines the band width of a matrix with known           *
+C  permutation of the nodes of its graph.                        *
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  NNODES : )  same as output from SUBROUTINE BLDGPH.            *
+C  NEIGHB : )  These vectors describe the graph of the matrix.   *
+C  INB    : )                                                    *
+C  NOLD   : permutation vector NOLD(1:NNODES)                    *
+C           For I=1, ..., NNODES,  NORG(I) designates the        *
+C           original index of the node now numbered by I.        *
+C  NNEW   : vector NNEW(1:NNODES), the inverse permutation of    *
+C           NOLD.                                                *
+C           For I=1, ..., NNODES,  NNEW(I) indicates the new     *
+C           index of the node previously numbered by I.          *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETER:                                             *
+C  =================                                             *
+C  IBDWID : Band width, i.e., the maximal distance of two        *
+C           adjacent nodes after the permutation                 *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  Required subroutines: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author    : Elmar Pohl                                        *
+C  Date      : 11.17.1991                                        *
+C  Source    : FORTRAN 77                                        *
+C                                                                *
+C*****************************************************************
+C
+      INTEGER NEIGHB(*), INB(*), NNEW(*), NOLD(*)
+C
+      MAXBW = 0
+      DO 10 I = 1, NNODES - 1
+         DO 20 K = INB(NOLD(I)), INB(NOLD(I) + 1) - 1
+            IDIFF = ABS(I - NNEW(NEIGHB(K)))
+            IF (IDIFF .GT. MAXBW) MAXBW = IDIFF
+   20    CONTINUE
+   10 CONTINUE
+      IBDWID = MAXBW
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      subroutine ckbdwd (n, neighb, inb, m, icm, icmrev)
+C[IX{ckbdwd}*)
+C[BE*)
+C
+C*****************************************************************
+C check if by applying the Cuthill-McKee permutation the band    *
+C width might be enlarged instead of being reduced. In this      *
+C unlucky case the matrix shall remain unchanged, that is shall  *
+C not be permuted.                                               *
+C                                                                *
+C Input parameters:                                              *
+C =================                                              *
+C N          order of the sparse matrix          \  incidence    *
+C NEIGHB     indices of adjacent nodes            > graph        *
+C INB        indices for NEIGHB                  /  (see BLDGPH) *
+C M          half band width of the matrix produced by applying  *
+C            the Cuthill-McKee permutation                       *
+C ICM        (1:N)-vector with the CM-permutation. For i=1(1)n   *
+C            ICM(i) is the original number of the node with the  *
+C            new number i.                                       *
+C ICMREV     (1:N)-vector with the inverse permutation of ICM.   *
+C            For i=1(1)n ICMREV(i) is the new number of the node *
+C            with the old number i.                              *
+C                                                                *
+C Output parameters:                                             *
+C ==================                                             *
+C M          unchanged, if M <= original band width, else the    *
+C            original band width                                 *
+C ICM        (1:N)-vector with the identical permutation, if M   *
+C            had to be corrected, else with the CM-permutation   *
+C ICMREV     (1:N)-vector with the inverse permutation of ICM    *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  Required subroutines: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author    : Juergen Dietel                                    *
+C  Date      : 06.19.1996                                        *
+C  Source    : FORTRAN 77                                        *
+C                                                                *
+C*****************************************************************
+C
+      integer n, neighb(*), inb(*), m, icm(*), icmrev(*)
+C     half band width of the original matrix
+      integer morig
+      integer diff
+      integer i
+      integer j
+C
+C
+      morig = 0
+      do 20 i = 1, n
+        do 10 j = inb(i), inb(i + 1) - 1
+          diff = abs(i - neighb(j))
+          if (diff .gt. morig) morig = diff
+  10    continue
+  20  continue
+C
+C     new band width not smaller, but really bigger???
+C     In this unlucky case the matrix shall remain unchanged.
+C
+      if (m .gt. morig) then
+        m = morig
+        do 30 i = 1, n
+          icm(i)    = i
+          icmrev(i) = i
+   30   continue
+      end if
+
+      end
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE LVSTRU (IROOT, NNODES, NEIGHB, INB,
+C[IX{LVSTRU}*)
+     +                   MARK, NLV, LEVEL, ILV, LNODES)
+C
+C*****************************************************************
+C                                                                *
+C  Subroutine for the Cuthill-McKee algorithm.                   *
+C  It constructs the level structure of the component of a graph *
+C  generated by IROOT.                                           *
+C[BE*)
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  IROOT  : Number of the starting node                          *
+C  NNODES : Number of nodes of the graph. The graph is defined by*
+C           the following two vectors:                           *
+C  NEIGHB : vector NEIGHB(1:*) with the lists of adjacent nodes  *
+C           For I=1, ..., NNODES, the vector NEIGHB contains the *
+C           indices of the nodes that are adjacent to node I in  *
+C           NEIGHB(K) for  K=INB(I), ...,  INB(I+1)-1.           *
+C  INB    : vector INB(1:NNODES+1) with indices for the sublists *
+C           in NEIGHB. We must have that                         *
+C             INB(NNODES+1) = 1 + number of elements in NEIGHB . *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  ==================                                            *
+C  NLV    : number of levels                                     *
+C  LEVEL  : vector LEVEL(1:NNODES) listing nodes of identical    *
+C           level. For I=1, ..., NLV, the vector LEVEL contains  *
+C           the indices of the nodes of level I in positions     *
+C           LEVEL(K) for  K = ILV(I), ..., ILV(I+1)-1.           *
+C  ILV    : vector ILV(1:NLV+1) with indices for the level list  *
+C           LEVEL(). We must have  ILV(NLV+1) = 1 + number of    *
+C           entries in LEVEL .  If the graph is connected, this  *
+C           number is equal to  NNODES + 1.                      *
+C  LNODES : number of nodes in the component                     *
+C                                                                *
+C                                                                *
+C  AUXILIARY PARAMETER:                                          *
+C  ====================                                          *
+C  MARK   : LOGICAL MARK(1:NNODES), marking some nodes           *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  Required subroutines: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author    : Elmar Pohl                                        *
+C  Date      : 11.17.1991                                        *
+C  Source    : FORTRAN 77                                        *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+      INTEGER NEIGHB(*), INB(1:NNODES+1), LEVEL(1:NNODES), ILV(*)
+      LOGICAL MARK(1:NNODES)
+C
+      NLV = 0
+      LEVEL(1) = IROOT
+      MARK(IROOT) = .TRUE.
+      N = 1
+C
+C     N is the number of nodes already found
+C
+      LEVEND = 0
+   10 CONTINUE
+         NLV = NLV + 1
+C
+C        NLV is the number of already found levels
+C
+         LEVBEG = LEVEND + 1
+         LEVEND = N
+C
+C        LEVBEG denotes the start, while LEVEND denotes the end
+C        of the last level in LEVEL()
+C
+         ILV(NLV) = LEVBEG
+C
+C        Find nodes of level  NLV+1:
+C        search for nodes adjacent to nodes of level NLV,
+C        record them in LEVEL, if they have not been marked
+C
+         DO 20 I = LEVBEG, LEVEND
+            DO 30 J = INB(LEVEL(I)), INB(LEVEL(I) + 1) - 1
+                IF (.NOT. MARK(NEIGHB(J))) THEN
+                   N = N + 1
+                   LEVEL(N) = NEIGHB(J)
+                   MARK(NEIGHB(J)) = .TRUE.
+                END IF
+   30       CONTINUE
+   20    CONTINUE
+      IF (N .GT. LEVEND) GOTO 10
+C
+      LNODES = LEVEND
+      ILV(NLV + 1) = LNODES + 1
+C
+C     Mark all recently marked nodes .FALSE.
+C
+      DO 40 I = 1, LNODES
+         MARK(LEVEL(I)) = .FALSE.
+   40 CONTINUE
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE PERMUT (N, IPERM, XOLD, XNEW)
+C[IX{PERMUT}*)
+C[BE*)
+C
+C*****************************************************************
+C                                                                *
+C  Subroutine for solving linear systems of equations with the   *
+C  Cuthill-McKee algorithm.                                      *
+C  PERMUT performs the permutation defined in IPERM on XOLD.     *
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  N      : order of the vector                                  *
+C  IPERM  : vector IPERM(1:N) with the permutations of 1, ..., N *
+C  XOLD   : vector XOLD(1:N) whose entries are to be permuted    *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETER:                                             *
+C  =================                                             *
+C  XNEW   : vector XNEW(1:N), the permuted vector                *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  Required subroutines: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author    : Elmar Pohl                                        *
+C  Date      : 17.11.1991                                        *
+C  Source    : FORTRAN 77                                        *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+C
+      INTEGER IPERM(*)
+      DIMENSION XOLD(*), XNEW(*)
+C
+      DO 10 I = 1, N
+         XNEW(IPERM(I)) = XOLD(I)
+   10 CONTINUE
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE RDMTRX (FLNAM, MAXELM, MAXROW, NROW, NV, V, IC,
+     +                   IR)
+C[IX{RDMTRX}*)
+C[BE*)
+C
+C*****************************************************************
+C                                                                *
+C  Subroutine for solving of linear systems with sparse matrices.*
+C  It opens a data file and reads matrix elements into the vector*
+C  V. It thus prepares for the Cuthill-McKee algorithm.          *
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  FLNAM  : Name of the input file with the following structure: *
+C           - number of rows of the matrix                       *
+C           - for each row:                                      *
+C             - for each nonzero element we store the tupel:     *
+C               <column index> <element>                         *
+C               (indices start at 1)                             *
+C             - a tupel with column index 0 denotes the end of   *
+C               the row                                          *
+C  MAXELM : Dimensioning number for arrays, that will contain    *
+C           matrix elements. MAXELM must be at least equal to the*
+C           number of nonzero matrix elements.                   *
+C  MAXROW : Dimensioning number for auxiliary arrays.            *
+C           MAXROW must be at least as large as the number of    *
+C           matrix rows.                                         *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  ==================                                            *
+C  NROW   : number of rows                                       *
+C  NV     : number of entries in the vector V ( = number of non- *
+C           zero entries in the original matrix). The vector IC  *
+C           has the same number of entries.                      *
+C  V      : vector V(1:NV) with nonzero entries. The nonzero     *
+C           elements of the original matrix are written row-wise *
+C           and in sequence in V.                                *
+C  IC     : vector IC(1:NV) of column indices. For each V(I), the*
+C           value in IC(I) denotes the column of the matrix that *
+C           contained  V(I). (Indices start with 1)              *
+C  IR     : vector IR(1:NROW+1) with row pointers. For I=1, ..., *
+C           , NROW,  IR(I) denotes the index, where row  I starts*
+C           in  V and IC. We must have  IR(NROW+1) =  NV+1.      *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  Required subroutines: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author    : Elmar Pohl                                        *
+C  Date      : 11.17.1991                                        *
+C  Source    : FORTRAN 77                                        *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+C
+      INTEGER IC(*), IR(*)
+      DIMENSION V(*)
+      CHARACTER*(*) FLNAM
+C
+      PARAMETER (IFLNO=8)
+C
+      OPEN (UNIT=IFLNO, FILE=FLNAM)
+      READ (IFLNO, *) NROW
+      if (nrow + 1 .gt. maxrow) then
+        write (*,*) 'RDMTRX: Matrix too big (maximum: ',
+     +              maxrow - 1, 'rows)!'
+        stop
+      end if
+      NV = 0
+      DO 10 I = 1, NROW
+         IR(I) = NV + 1
+   20    CONTINUE
+            READ (IFLNO, *) IC0, V0
+            IF (IC0 .EQ. 0) GOTO 10
+            NV = NV + 1
+            if (nv .gt. maxelm) then
+              write (*,*) 'RDMTRX: Matrix has too many non-zero',
+     +                    'elements (maximum: ', maxelm, ')!'
+              stop
+            end if
+            V(NV) = V0
+            IC(NV) = IC0
+         GOTO 20
+   10 CONTINUE
+      CLOSE (IFLNO)
+      IR(NROW + 1) = NV + 1
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE SRTDEG (NODE, IDEG, IBEG, IEND)
+C[IX{SRTDEG}*)
+C
+C*****************************************************************
+C                                                                *
+C  Subroutine for  SUBROUTINE CUTHIL.                            *
+C  Sorts a partial list of nodes in the vector NODE according to *
+C  increasing degrees.                                           *
+C[BE*)
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  NODE   : vector NODE(1:*) with node numbers. Each entry must  *
+C           be an index of IDEG.                                 *
+C  IDEG   : vector IDEG(1:*) with the node degrees. The node     *
+C           NODE(I) has the degree   IDEG(NODE(I)).              *
+C  IBEG   : starting index for the nodes that shall be sorted.   *
+C  IEND   : final index of the nodes to be sorted                *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETER:                                             *
+C  =================                                             *
+C  NODE   : as on input, except for partial reordering           *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  Required subroutines: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author    : Elmar Pohl                                        *
+C  Date      : 11.17.1991                                        *
+C  Source    : FORTRAN 77                                        *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+      INTEGER NODE(*), IDEG(*)
+C
+      DO 10 I = IBEG + 1, IEND
+         NODE0 = NODE(I)
+         IDEG0 = IDEG(NODE0)
+C
+         K0 = I
+         DO 20 K = I - 1, IBEG, -1
+            IF (IDEG0 .GE. IDEG(NODE(K))) GOTO 30
+            NODE(K + 1) = NODE(K)
+            K0 = K
+   20    CONTINUE
+   30    NODE(K0) = NODE0
+   10 CONTINUE
+      RETURN
+      END

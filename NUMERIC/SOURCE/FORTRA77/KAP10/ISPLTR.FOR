@@ -1,0 +1,232 @@
+C[BA*)
+C[LE*)
+      SUBROUTINE ISPLTR (N,XN,FN,MS,PX,PY,R,B,C,D,PHIN,PHIR,DUMMY,
+C[IX{ISPLTR}*)
+     +                   IERR)
+C
+C*****************************************************************
+C                                                                *
+C  ISPLTR computes the coefficients R(I), B(I), C(I), D(I) for   *
+C  I=0,1,...,N-1 of a transformed parametric cubic interpolating *
+C  spline for a closed everywhere smooth curve K.                *
+C[BE*)
+C  This program determines the transformed coordinates PHIN(I)   *
+C  and R(I) from the given nodes XN(I), FN(I) for I=0,1,...,N.   *
+C  The new points PHIN(I) and R(I) define a nonparametric        *
+C  periodic interpolating spline S(PHI) of the form:             *
+C                                                                *
+C  S(PHI) = R(I) + B(I)(PHI-PHIN(I)) + C(I)(PHI-PHIN(I))**2 +    *
+C                                    + D(I)(PHI-PHIN(I))**3      *
+C                                                                *
+C  for PHI in the interval [PHIN(I),PHIN(I+1)] for I=0,1,...,N-1.*
+C                                                                *
+C  Since the nodes PHIN(I) must be ordered monotonically, we must*
+C  translate and rotate the origin to P=(PX,PY) by an angle PHIR.*
+C  This is clearly dependent on the original nodes XN(I), FN(I). *
+C  In order to be able to achieve monotonicity for the PHIN(I),  *
+C  the following must be true for the original nodes:            *
+C   - the new origin P must lie in the region F defines by XN(I),*
+C     FN(I) so that every ray from P intersects the boundary     *
+C     curve of F precisely once.                                 *
+C     (The coordinates PX and PY of P should be specified by the *
+C     user. See input parameter MS).                             *
+C   - the points XN(I), FN(I) must be ordered so that the        *
+C     boundary curve of F is traversed counterclockwise from     *
+C     XN(0), FN(0) to XN(N), FN(N). For periodicity of S(PHI),   *
+C     the endpoint  XN(N), FN(N) must be equal to XN(0), FN(0).  *
+C                                                                *
+C  The coordinates of PHIN(I), R(I) are computed as:             *
+C         PHIN(0) = 0,                                           *
+C         PHIN(I) = ATAN(Y'(I)/X'(I)) - PHIR , I=1,...,N-1,      *
+C         PHIN(N) = 2*PI,                                        *
+C         R(I) = SQRT(X'(I)**2 + Y'(I)**2), I=0,1,...,N,         *
+C         MIT:  PHIR = ATAN(FN(0)/XN(0)),                        *
+C               X'(I) = XN(I) - PX,  Y'(I) = FN(I) - PY.         *
+C                                                                *
+C                                                                *
+C  REMARK:  The curve K can be evaluated using SUBROUTINE        *
+C  =======  TSPANA. A table of values for K can be generated     *
+C           with SUBROUTINE TSPTAB.                              *
+C           Both subroutines need the parameters PX, PY and      *
+C           PHIR from this subroutine in order to transform      *
+C           the coordinates.                                     *
+C                                                                *
+C                                                                *
+C  ASSUMPTIOS:    1.         N > 2                               *
+C  ===========    2.     XN(0) = XN(N)                           *
+C                 3.     FN(0) = FN(N)                           *
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  N  :  index of the final node                                 *
+C  XN :  vector XN(0:N); the nodes for I = 0,1,...,N             *
+C  FN :  vector FN(0:N); the values at XN(I)                     *
+C                                                                *
+C  MS :  Index for the translation of the origin:                *
+C        MS > 0 : The user specifies the coordinates PX, PY      *
+C        MS = 0 : no shift, i.e., PX=PY=0                        *
+C        MS < 0 : the shift coordinates PX, PY are computed in   *
+C                 SUBROUTINE ISPLTR as:                          *
+C                    PX = (XMAX+XMIN)/2                          *
+C                    PY = (YMAX+YMIN)/2                          *
+C                    where : XMAX = DMAX1(XN(I)) ]               *
+C                            XMIN = DMIN1(XN(I)) ] I=0,1,...,N   *
+C                            YMAX = DMAX1(FN(I)) ]               *
+C                            YMIN = DMIN1(FN(I)) ]               *
+C                 Please note: This does not insure that the     *
+C                 point P will be properly centerd as required.  *
+C                 If this is not the case IERR = -3 will result. *
+C                                                                *
+C  PX : ]  the coordinates of P                                  *
+C  PY : ]  (for MS > 0)                                          *
+C                                                                *
+C                                                                *
+C  AUXILIARY VARIABLES:                                          *
+C  ====================                                          *
+C  DUMMY :  vector DUMMY(1:5*N+1)                                *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  ==================                                            *
+C  R  :  ] vectors ..(0:N);                                      *
+C  B  :  ] the elements in positions 0 to N-1 are the            *
+C  C  :  ] coefficients of the spline function S(PHI).           *
+C  D  :  ] B(N), C(N), D(N) are used for storage.                *
+C          The elements R(I), I=0,1,...,N contain the length of  *
+C          the vectors with angle PHIN(I).                       *
+C                                                                *
+C  PHIN :  vector PHIN(0:N); PHIN(I) denotes the angle of        *
+C          (XN(I),FN(I)) as seen from P=(PX,PY).                 *
+C                                                                *
+C  PX   : ] coordinates of P                                     *
+C  PY   : ]                                                      *
+C  PHIR :  rotation angle of the coordinate system in radians    *
+C  IERR :  error parameter                                       *
+C          =  0 :  All is ok                                     *
+C          = -1 :  N < 3                                         *
+C          = -3 :  non-monotonous nodes PHIN(I);                 *
+C                  PHIN(I) >= PHIN(I+1) for some I=0,1,...,N-1   *
+C          = -4 :  XN(0) not equal to XN(N)  or                  *
+C                  FN(0) not equal to FN(N)                      *
+C          =  1 :  crash in CYTSY, system matrix numerically     *
+C                  singular.                                     *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  Subroutines required: ISPLPE                                  *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author   : GÅnter Palm                                        *
+C  Date     : 04.15.1988                                         *
+C  Source   : FORTRAN 77                                         *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DOUBLE PRECISION XN(0:N), FN(0:N), R(0:N), B(0:N), C(0:N),
+     +                 D(0:N), PHIN(0:N), DUMMY(1:5*N+1)
+C
+C-----Check input data
+C
+      IERR = -1
+      IF (N .LT. 3) RETURN
+      IERR = -4
+      IF (XN(0) .NE. XN(N)) RETURN
+      IF (FN(0) .NE. FN(N)) RETURN
+C
+C-----Initialize
+C
+      PI  = 4.0D0*DATAN(1.0D0)
+      PI2 = 2.0D0*PI
+C
+C-----Transform the coordinates
+C
+C     If MS differs from 0, translate the origin to P=(PX,PY),
+C     by changing the coordinates of X(I), Y(I) by PX and PY.
+C
+      IF (MS .EQ. 0) THEN
+C
+C       no shift
+C
+        PX = 0.0D0
+        PY = 0.0D0
+        DO 10 I=0,N,1
+          B(I) = XN(I)
+          C(I) = FN(I)
+   10   CONTINUE
+      ELSE
+C
+C       shift by  (PX,PY)
+C
+        IF (MS .LT. 0) THEN
+C
+C         Compute PX and PY
+C
+          XMAX = XN(0)
+          XMIN = XN(0)
+          YMAX = FN(0)
+          YMIN = FN(0)
+          DO 20 I=1,N,1
+            XMAX = DMAX1(XMAX,XN(I))
+            XMIN = DMIN1(XMIN,XN(I))
+            YMAX = DMAX1(YMAX,FN(I))
+            YMIN = DMIN1(YMIN,FN(I))
+   20     CONTINUE
+          PX = (XMAX+XMIN)/2.0D0
+          PY = (YMAX+YMIN)/2.0D0
+        ENDIF
+        DO 30 I=0,N,1
+          B(I) = XN(I) - PX
+          C(I) = FN(I) - PY
+   30   CONTINUE
+      ENDIF
+C
+C-----Compute the transformed nodes
+C
+C     1. Compute R(I); Return if R(I)=0, i.e., when
+C        (PX,PY) is one of the nodes
+C
+      IERR = -3
+      DO 40 I=0,N,1
+        R(I) = DSQRT(B(I)*B(I) + C(I)*C(I))
+        IF (R(I) .EQ. 0.0D0) RETURN
+   40 CONTINUE
+C
+C     2. Compute the coordinates X',Y' rotated by ALPHA from:
+C
+C           [ X']   [ COS(ALPHA)   -SIN(ALPHA) ] [ X ]
+C           [   ] = [                          ] [   ]
+C           [ Y']   [ SIN(ALPHA)    COS(ALPHA) ] [ Y ]
+C
+C        with  ALPHA = -PHIR
+C
+      PHIR = DACOS(B(0)/R(0))
+      IF (C(0) .LT. 0.0D0) PHIR = PI2 - PHIR
+      CA = B(0)/R(0)
+      SA = -C(0)/R(0)
+      DO 50 I = 0,N
+        D(I) = B(I)*CA - C(I)*SA
+        C(I) = B(I)*SA + C(I)*CA
+   50 CONTINUE
+C
+C     3. Compute the angular coordinate PHIN(I); Return
+C        if the angles do not increase strictly monotonically
+C
+      PHIN(0) = 0.0D0
+      DO 60 I = 1,N-1
+        PHIN(I) = DACOS(D(I)/R(I))
+        IF (C(I) .LT. 0.0D0) PHIN(I) = PI2 - PHIN(I)
+        IF (PHIN(I) .LE. PHIN(I-1)) RETURN
+   60 CONTINUE
+      PHIN(N) = PI2
+C
+C-----Compute the spline coefficients
+C
+      CALL ISPLPE (N,PHIN,R,1,B,C,D,DUMMY(1),DUMMY(N+2),DUMMY(2*N+2),
+     +             DUMMY(3*N+2),DUMMY(4*N+2),IERR)
+      RETURN
+      END

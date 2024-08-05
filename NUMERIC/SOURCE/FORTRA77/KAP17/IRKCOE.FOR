@@ -1,0 +1,193 @@
+C[BA*)
+C[LE*)
+      SUBROUTINE IRKCOE (MMAX,LUN,C,A,ALPHA,BETA)
+C[IX{IRKCOE}*)
+C
+C*****************************************************************
+C                                                                *
+C This subroutine determines the coefficients for the implicit   *
+C RUNGE-KUTTA methods (IRKM) of order 1 up to MMAX, as specified *
+C in the calling program.                                        *
+C[BE*)
+C The results are stored unformatted in an external file with    *
+C the logical number LUN. There they can be called up and pro-   *
+C cessed further by the SUBROUTINE IMRUKU.                       *
+C For each order the GAUSS-LEGENDRE nodes ALPHA(J), J=1, ..., M, *
+C of the interval of integration are determined first.           *
+C These are determined from the zeros of the LEGENDRE polynomials*
+C The coefficients BETA(I,J) and A(J), I,J=1, ..., M, are ob-    *
+C tained as the solution of a M*(M+1) linear system of equations.*
+C The solution of the linear system of equations can be deter-   *
+C mined by multiplying LAGRANGE polynomials.                     *
+C                                                                *
+C                                                                *
+C INPUT PARAMETERS:                                              *
+C =================                                              *
+C MMAX   : maximum order up to which the coefficients of the     *
+C          IRKM are to be created                                *
+C LUN    : number of the output file, in which the coefficients  *
+C          are to be stored (unformatted)                        *
+C ALPHA  : vector ALPHA(1:MMAX);             ) the coefficients  *
+C BETA   : 2-dim. array BETA(1:MMAX,1:MMAX); ) of the IRKM       *
+C A      : vector A(1:MMAX);                 )                   *
+C C      : vector C(0:MMAX); auxiliary vector for GALE0 and      *
+C          vector used to store the coefficients of the          *
+C          LAGRANGE polynomials. Only used for storage space.    *
+C                                                                *
+C                                                                *
+C OUTPUT PARAMETER:                                              *
+C =================                                              *
+C n o n e                                                        *
+C                                                                *
+C                                                                *
+C All results, i.e., the orders and the coefficients of the IRKM,*
+C are saved unformatted in the file with the logic number LUN.   *
+C This file is to be read by SUBROUTINE IMRUKU.                  *
+C                                                                *
+C                                                                *
+C LOCAL VARIABLES:                                               *
+C ================                                               *
+C M      : current order for which the coefficients are          *
+C          determined.                                           *
+C MM1    : auxiliary variable for M-1                            *
+C MM2    : auxiliary variable for M-2                            *
+C I,J,K  : control variables                                     *
+C JM1    : auxiliary variable for J-1                            *
+C JP1    : auxiliary variable for J+1                            *
+C NG     : counter for the number of factors                     *
+C          (ALPHA(K)-ALPHA(J)) (J constant,K=1,...,J-1,J+1,...,M)*
+C          of the LAGRANGE-polynomials that are multiplied.      *
+C ZJ     : counter of the J-th LAGRANGE-polynomial               *
+C BETAJK : ) auxiliary variables for determining the coefficients*
+C ALPHAK : ) BETA(J,K) or ALPHA(K) when multiplying  the         *
+C          ) LAGRANGE polynomials                                *
+C FLAG   : logic variable; input parameter of GALE0              *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: GALE0                                   *
+C                                                                *
+C                                                                *
+C  source : 1. W. Glasmacher, D. Sommer, see [GLAS66].           *
+C                                                                *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author   : Thomas Eul                                         *
+C  date     : 09.17.1985                                         *
+C  source   : FORTRAN 77                                         *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+C
+C     parameters
+      INTEGER MMAX, LUN
+      DIMENSION C(0:MMAX), A(MMAX), ALPHA(MMAX), BETA(MMAX,MMAX)
+C
+C     local variables
+      INTEGER M, MM1, MM2, I, J, JM1, JP1, K, NG
+      DOUBLE PRECISION ZJ, BETAJK, ALPHAK
+      LOGICAL FLAG
+C
+C*****************************************************************
+C* the weights A(J) and BETA(J,L), as well as the nodes          *
+C* ALPHA(J) are produced for the orders of 1 to MMAX and they    *
+C* are stored, unformatted, in the file numbered LUN.            *
+C*****************************************************************
+C
+      FLAG = .FALSE.
+      DO 2000 M = 1,MMAX
+         MM1 = M - 1
+         MM2 = M - 2
+C
+C*****************************************************************
+C*    G A U S S - L E G E N D R E   n o d e s                    *
+C*****************************************************************
+C        determine all zeros of the LEGENDRE polynomials, i.e.,
+C        the ALPHA(J). These are are all real and lie
+C        symmetrically in the interval  -1. <= ALPHA(J) <= 1.
+C
+         IF (M .GT. 1) THEN
+            CALL GALE0 (M,FLAG,ALPHA,C)
+         ELSE
+            ALPHA(1) = 0.0D0
+         ENDIF
+C
+C        transform the ALPHA(J) to the interval
+C        0 <= alpha(j) <= 1
+C
+         DO 10 I = 1,M
+            ALPHA(I) = 0.5D0*ALPHA(I) + 0.5D0
+   10    CONTINUE
+C
+C*****************************************************************
+C*      determine the weights  BETA(J,K)  and  A(J)              *
+C*****************************************************************
+C        counter ZJ of the J-th LAGRANGE polynomial of degree M
+C
+         DO 1000 J = 1,M
+            JM1 = J - 1
+            JP1 = J + 1
+            ZJ = 1.0D0
+            DO 20 K = 1,JM1
+               ZJ = (ALPHA(J)-ALPHA(K)) * ZJ
+   20       CONTINUE
+            DO 30 K = JP1,M
+               ZJ = (ALPHA(J)-ALPHA(K)) * ZJ
+   30       CONTINUE
+C
+C           determine the coefficient of the J-th
+C           LAGRANGE-polynomial of degree M
+C
+            C(0) = 1.0D0
+            NG = 0
+            DO 60 K = 1,JM1
+               ALPHAK = -ALPHA(K)
+               DO 40 I = NG,0,-1
+                  C(I+1) = C(I)
+   40          CONTINUE
+               C(0) = ALPHAK * C(1)
+               DO 50 I = 1,NG
+                  C(I) = C(I) + ALPHAK*C(I+1)
+   50          CONTINUE
+               NG = NG + 1
+   60       CONTINUE
+            DO 90 K = JP1,M
+               ALPHAK = -ALPHA(K)
+               DO 70 I = NG,0,-1
+                  C(I+1) = C(I)
+   70          CONTINUE
+               C(0) = ALPHAK * C(1)
+               DO 80 I = 1,NG
+                  C(I) = C(I) + ALPHAK*C(I+1)
+   80          CONTINUE
+               NG = NG + 1
+   90       CONTINUE
+C
+C           determine the BETA(J,L) and all A(J)
+C
+            ZJ = 1.0D0 / ZJ
+            AJ = 0.0D0
+            DO 110 K = 1,M
+               BETAJK = 0.0D0
+               DO 100 L = 1,M
+                  BETAJK = BETAJK + C(L-1) * ALPHA(K)**L / DBLE(L)
+  100          CONTINUE
+               BETA(J,K) = BETAJK * ZJ
+               AJ = AJ + C(K-1) / DBLE(K)
+  110       CONTINUE
+            A(J) = AJ * ZJ
+ 1000    CONTINUE
+C
+C        unformatted output of the order combined with the corres-
+C        ponding coefficients to the file numbered LUN
+C
+         WRITE (LUN) M,(ALPHA(I),I=1,M)
+     1                ,((BETA(I,J),I=1,M),J=1,M)
+     2                ,(A(I),I=1,M)
+ 2000 CONTINUE
+      RETURN
+      END

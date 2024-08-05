@@ -1,0 +1,417 @@
+C[BA*)
+C[KA{F 17}
+C[  {Initial Value Problems}
+C[  {Initial Value Problems for Ordinary Differential
+C[   Equations}*)
+C[FE{F 17.3}{One-Step Methods}{One-Step Methods}*)
+C[LE*)
+      SUBROUTINE DEQSSP (X,Y,FCT,XEND,H,HMAX,ABSERR,RELERR,IND,
+C[IX{DEQSSP}*)
+     1                   IERR,AUXF)
+C
+C*****************************************************************
+C                                                                *
+C  Numerical solution of an ordinary differential equation       *
+C                                                                *
+C     Y' = F(X,Y) with given initial value  Y(X0) = Y0           *
+C                                                                *
+C  by a user specified one-step method.                          *
+C  Any one of the following methods may be chosen:               *
+C  1) EULER-CAUCHY polygonal method,                             *
+C  2) method of HEUN, and                                        *
+C  3) classical RUNGE-KUTTA method.                              *
+C[BE*)
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C                                                                *
+C  X     : starting value for X.                                 *
+C  Y     : initial value of the solution Y at X.                 *
+C  FCT   : SUBROUTINE that evaluates the right hand side of the  *
+C          differential equation. It has to be formatted as      *
+C          follows:                                               *
+C                                                                *
+C             SUBROUTINE FCT(X,Y,F)                              *
+C             DOUBLE PRECISION X,Y,F                             *
+C                  .                                             *
+C                  .                                             *
+C                  .                                             *
+C                                                                *
+C          In the calling program it must be declared as         *
+C          EXTERNAL. Its variables have the following meaning:   *
+C             X   independent variable X.                        *
+C             Y   dependent variable Y.                          *
+C             F   function value of the right hand side F(X,Y)   *
+C                 of the differential equation Y'=F(X,Y).        *
+C  XEND  : value for X where the solution is desired; it may be  *
+C          to the left of the starting value for X.              *
+C  H     : step size for the next step. It is usually determined *
+C          by the program.                                       *
+C  HMAX  : maximum step size allowed, HMAX must be positive.     *
+C  ABSERR: )                                                     *
+C  RELERR: ) error parameters, which must be >= 0. The subroutine*
+C            performs a mixed test:                              *
+C              ABS (LOCAL ERROR) .LE. ABS(Y)*RELERR + ABSERR.    *
+C           Thus, if RELERR is chosen as zero, this tests for the*
+C           absolute error. If ABSERR is chosen as zero, this    *
+C           tests for the relative error.                        *
+C           RELERR and ABSERR should be chosen at least ten times*
+C           larger than the machine constant. If this is not     *
+C           the case the program defaults to these settings.     *
+C  IND   : INTEGER vector IND(1:3).                              *
+C          IND(1) indicates whether DEQSSP has already been      *
+C          called:                                               *
+C          = 0: DEQSSP was not been called during this program   *
+C               run.                                             *
+C          = 1: DEQSSP has been called during this run.          *
+C          IND(2) indicates the method used:                     *
+C          = 1: EULER-CAUCHY poygonal method.                    *
+C          = 2: method of HEUN.                                  *
+C          = 3: classical RUNGE-KUTTA method.                    *
+C          IND(3) indicates whether integration is acceptable    *
+C          beyond XEND (this can be used e.g. for discontinuities*
+C          of the right hand side F of the differential equation)*
+C          = 0: no restrictions.                                 *
+C          = 1: the differential equation may only be integrated *
+C               up to XEND.                                      *
+C  AUXF : REAL auxiliary vector AUXF(0:4,3)                      *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  ==================                                            *
+C                                                                *
+C  X     : X value for which solution is desired (should equal   *
+C          input XEND)                                           *
+C  Y     : value for the solution at X.                          *
+C  H     : terminal step size used. It should remain unchanged   *
+C          for the next call.                                    *
+C  IND(1): after the first call set to 2, it should not be       *
+C          changed.                                              *
+C  IERR  : error parameter:                                      *
+C          = 0: everything o.k. After re-setting of XEND, DEQSSP *
+C               can be called again.                             *
+C          = 1: everything o.k. After re-setting of XEND, DEQSSP *
+C               can be called again. The solution has already    *
+C               been determined up to the x value AUXF(IPTR,1)   *
+C               with AUXF(IPTR,2) as its y value. For XEND .LT.  *
+C               AUXF(IPTR,1) further solution values will be     *
+C               determined by interpolation.                     *
+C          = 2: after 500 function evaluations the procedure did *
+C               not reach XEND. A repeated call without any      *
+C               change of the parameters may be successful.      *
+C               (otherwise, try to increase the error parameters)*
+C          = 3: the step size is less than eight times the       *
+C               machine constant at an x value. To continue with *
+C               another call, H and the error parameters must be *
+C               increased.                                       *
+C          = 4: ABSERR or RELERR is negative or both             *
+C               ABSERR = 0.0 and RELERR = 0.0.                   *
+C          = 5: XEND is equal to X.                              *
+C          = 6: HMAX is negative.                                *
+C          = 7: number for method is erroneous.                  *
+C          = 8: IND(3) is erroneous.                             *
+C                                                                *
+C  NOTES:                                                        *
+C  ======                                                        *
+C                                                                *
+C  1) The program uses step size control by doubling or halving  *
+C     the step size. Thus, it independently finds the step sizes *
+C     for which the required error bounds can be maintained.     *
+C  2) If the distance remaining towards XEND is smaller than     *
+C     the current, automatically determined step size, the       *
+C     solution at XEND is determined by interpolation.           *
+C     The interpolation is effected by use of a circular buffer. *
+C     This buffer has to contain a sufficient number of entries  *
+C     before it can be used to interpolate with a sufficiently   *
+C     high order. Thus it may happen that the solution is        *
+C     determined much farther than to XEND in the first call.    *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: MACHPD                                  *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author   : Jobst Hoffmann                                     *
+C  date     : 04.21.1990                                         *
+C  source   : FORTRAN 77                                         *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      INTEGER IND(3),IBUF(3),ICTFV(3),ICTV(3)
+C
+      DIMENSION ERRHAT(3),AUXF(0:4,3),ERREST(3)
+C
+      LOGICAL ERRV,FULL
+C
+      SAVE IPTR,FULL,LEN,FMACHP
+C
+      DATA IBEG/1/ METH/2/ IEND/3/
+      DATA ICTMAX/500/ IBUF/2,3,5/ ICTFV/1,3,7/ ICTV/2,5,11/
+      DATA ERRHAT/0.2D0,0.1D0,0.02D0/ ERREST/1.0D0,3.0D0,15.0D0/
+C
+      IF ( IND(IBEG) .EQ. 1 ) GOTO 10
+C
+C     determine the machine constant
+C.
+      FMACHP = 1.0D0
+    5 FMACHP = 0.5D0 * FMACHP
+      IF (MACHPD(1.0D0+FMACHP) .EQ. 1) GOTO 5
+      FMACHP = FMACHP * 2.0D0
+C
+      IERR = 0
+      IND(IBEG) = 1
+C.
+C     determine the length of the circular buffer needed for the
+C     interpolation and initialize pointer to the first element
+C     of this buffer
+C.
+      LEN = IBUF(IND(METH))
+      IPTR = 0
+      FULL = .FALSE.
+   10 IF ( IERR .EQ. 1 ) THEN
+C.
+C        the solution is known up to the point (X,Y) =
+C        (AUXF(IPTR,1), AUXF(IPTR,2)). Further output
+C        values may be produced by interpolation.
+C.
+         X0 = X
+         Y0 = Y
+         X1 = AUXF(IPTR,1)
+         Y1 = AUXF(IPTR,2)
+         GOTO 170
+      ELSEIF ( IERR .EQ. 2 ) THEN
+C.
+C        repeat call after excessive number of function calls
+C.
+         ICOUNT = 0
+         GOTO 120
+      ENDIF
+C.
+C     Input data error check, initialize variables
+C.
+      IF ( ABSERR .LE. 0.0D0 .AND. RELERR .LE. 0.0D0 ) THEN
+         IERR = 4
+         RETURN
+      ELSEIF ( XEND .EQ. X ) THEN
+         IERR = 5
+         RETURN
+      ELSEIF ( HMAX .LE. 0.0D0 ) THEN
+         IERR = 6
+         RETURN
+      ELSEIF ( IND(METH) .LT. 1 .OR. IND(METH) .GT. 3 ) THEN
+         IERR = 7
+         RETURN
+      ELSEIF ( IND(IEND) .LT. 0 .OR. IND(IEND) .GT. 1 ) THEN
+         IERR = 8
+         RETURN
+      ENDIF
+      ICOUNT = 0
+C.
+C     start computation, store the starting values in AUXF
+C.
+      HLOC = H
+      X0 = X
+      Y0 = Y
+      AUXF(IPTR,1) = X
+      AUXF(IPTR,2) = Y
+C.
+C     determine step size
+C.
+      IF ( DABS(H) .GT. HMAX ) H = HMAX
+      IF ( IND(IEND) .EQ. 0 ) THEN
+         H = DSIGN(H,XEND - X)
+      ELSE
+         H = DSIGN(DMIN1(DABS(H),DABS(XEND-X)*0.5D0),XEND-X)
+      ENDIF
+      IF ( DABS(H) .LE. 8.0D0*FMACHP*DABS(X) ) THEN
+         H = HLOC
+         IERR = 3
+         RETURN
+      ENDIF
+C.
+C     switch between the three allowed methods
+C.
+      GOTO (20,50,80) IND(METH)
+C.
+C     *** EULER-CAUCHY  polygonal method ***
+C.
+   20 CONTINUE
+   30 CALL FCT (X0,Y0,F0)
+      XH = X0 + H
+      X1 = XH + H
+      Y2 = Y0 + 2.0D0*H*F0
+   40 YH = Y0 + H*F0
+      CALL FCT (XH,YH,F1)
+      Y1 = YH + H*F1
+      GOTO 110
+C.
+C     *** method of HEUN ***
+C.
+   50 CONTINUE
+   60 CALL FCT (X0,Y0,F0)
+      XH = X0 + H
+      X1 = XH + H
+      Y2 = Y0 + 2.0D0*H*F0
+      CALL FCT (X1,Y2,F2)
+      Y2 = Y0 + H*(F0+F2)
+   70 YH = Y0 + H*F0
+      CALL FCT (XH,YH,FH)
+      YH = Y0 + 0.5D0*H*(F0+FH)
+      CALL FCT (XH,YH,FH)
+      Y1 = YH + H*FH
+      CALL FCT (X1,Y1,F1)
+      Y1 = YH + 0.5D0*H*(FH+F1)
+      GOTO 110
+C.
+C     *** classical RUNGE-KUTTA method ***
+C.
+   80 CONTINUE
+   90 CALL FCT (X0,Y0,F0)
+      XH = X0 + H
+      X1 = XH + H
+      RK12 = 2.0D0*H*F0
+      CALL FCT (XH,Y0+0.5D0*RK12,F2)
+      RK22 = 2.0D0*H*F2
+      CALL FCT (XH,Y0+0.5D0*RK22,F2)
+      RK32 = 2.0D0*H*F2
+      CALL FCT (X1,Y0+RK32,F2)
+      RK42 = 2.0D0*H*F2
+      Y2 = Y0 + (RK12 + 2.0D0*(RK22 + RK32) + RK42)/6.0D0
+  100 RK11 = H*F0
+      CALL FCT (X0+0.5D0*H,Y0+0.5D0*RK11,FH)
+      RK21 = H*FH
+      CALL FCT (X0+0.5D0*H,Y0+0.5D0*RK21,FH)
+      RK31 = H*FH
+      CALL FCT (XH,Y0+RK31,FH)
+      RK41 = H*FH
+      YH = Y0 + (RK11 + 2.0D0*(RK21 + RK31) + RK41)/6.0D0
+      CALL FCT (XH,YH,F1)
+      RK11 = H*F1
+      CALL FCT (XH+0.5D0*H,YH+0.5D0*RK11,F1)
+      RK21 = H*F1
+      CALL FCT (XH+0.5D0*H,YH+0.5D0*RK21,F1)
+      RK31 = H*F1
+      CALL FCT (X1,YH+RK31,F1)
+      RK41 = H*F1
+      Y1 = YH + (RK11 + 2.0D0*(RK21 + RK31) + RK41)/6.0D0
+C.
+C     count the number of function evaluations
+C.
+  110 ICOUNT = ICOUNT + ICTV(IND(METH))
+      IF ( ERRV ) THEN
+         ERRV = .FALSE.
+         ICOUNT = ICOUNT + ICTFV(IND(METH))
+      ENDIF
+      IF ( ICOUNT .GT. ICTMAX ) THEN
+         IERR = 2
+         X = AUXF(IPTR,1)
+         Y = AUXF(IPTR,2)
+         RETURN
+      ENDIF
+C.
+C     error estimate
+C.
+  120 D = DABS(Y1 - Y2)/ERREST(IND(METH))
+      IF ( D .GT. ABSERR + DABS(Y1)*RELERR ) THEN
+         ERRV = .TRUE.
+C.
+C        computation was unsuccessful, recompute with
+C        half the step size
+C.
+         H = 0.5D0*H
+         IF ( DABS(H) .LE. 8.0D0*FMACHP*DABS(X) ) THEN
+            IERR = 3
+            X = AUXF(IPTR,1)
+            Y = AUXF(IPTR,2)
+            RETURN
+         ENDIF
+         X1 = XH
+         XH = X0 + H
+         Y2 = YH
+         GOTO (40,70,100) IND(METH)
+      ELSE
+C.
+C        computation was successful, compute an improved
+C        estimate ...
+C.
+         GOTO (130,140,150) IND(METH)
+C.
+C        ... for EULER-CAUCHY ...
+C.
+  130    Y1 = 2.0D0*Y1 - Y2
+         GOTO 160
+C.
+C        ... for HEUN ...
+C.
+  140    Y1 = ( 4.0D0*Y1 - Y2 )/3.0D0
+         GOTO 160
+C.
+C        ... for RUNGE-KUTTA ...
+C.
+  150    Y1 = (16.0D0*Y1 - Y2)/15.0D0
+C.
+C        ... and the new values are stored in the buffer AUXF
+C.
+  160    IF ( IPTR + 2 .EQ. LEN ) FULL = .TRUE.
+         IPTR = MOD(IPTR+1,LEN)
+         AUXF(IPTR,1) = X1
+         AUXF(IPTR,2) = Y1
+      ENDIF
+C.
+C     if the solution varies only slightly, the next step may be
+C     executed with double the previous step size, provided this
+C     does not exceed the maximal allowable step size
+C.
+      IF ( D .LT. ERRHAT(IND(METH))*(ABSERR + DABS(Y1)*RELERR) )
+     F                      H = DSIGN(DMIN1(DABS(2.0D0*H),HMAX),H)
+C.
+C     if XEND was not been reached, another step will be
+C     executed. Otherwise ...
+C.
+  170 IF ( (X1 - XEND)*DSIGN(1.0D0,H) ) 180,190,200
+  180 IF ( IND(IEND) .EQ. 1 ) THEN
+         HLOC = H
+         H = DSIGN(DMIN1(DABS(H),DABS(XEND-X1)*0.5D0),XEND-X1)
+      ENDIF
+      X0 = X1
+      Y0 = Y1
+      GOTO (30,60,90) IND(METH)
+C.
+C     ... return to calling program ...
+C.
+  190 X = X1
+      Y = Y1
+      IERR = 0
+      RETURN
+C.
+C     ... or the desired solution is obtained by interpolation
+C     in case that the steps went beyond XEND.
+C     If there are not sufficiently many values in the buffer
+C     we perform another step.
+C.
+  200 IF ( .NOT. FULL ) THEN
+         X0 = X1
+         Y0 = Y1
+         GOTO (30,60,90) IND(METH)
+      ENDIF
+      DO 210 I=0,LEN-1
+         AUXF(I,3) = AUXF(I,2)
+  210 CONTINUE
+      DO 230 I=1,LEN-1
+         DO 220 K=LEN-1,I,-1
+            XDIF = AUXF(K,1) - AUXF(K-I,1)
+            AUXF(K,3) = (AUXF(K,3) - AUXF(K-1,3))/XDIF
+  220    CONTINUE
+  230 CONTINUE
+      Y = AUXF(LEN-1,3)
+      DO 240 I=LEN-2,0,-1
+         Y = Y*(XEND - AUXF(I,1)) + AUXF(I,3)
+  240 CONTINUE
+      X = XEND
+      IERR = 1
+      RETURN
+C
+      END

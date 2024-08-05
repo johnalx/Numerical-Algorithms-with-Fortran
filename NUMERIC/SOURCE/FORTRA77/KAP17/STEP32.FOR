@@ -1,0 +1,159 @@
+C[BA*)
+C[LE*)
+      SUBROUTINE STEP32 (X,H,Y,N,K,DES,YHILO,NOSTEP,XZI,IERR)
+C[IX{STEP32}*)
+C
+C*****************************************************************
+C                                                                *
+C This subroutine performs one integration step using the        *
+C RUNGE-KUTTA embedding formula composed of the RUNGE-KUTTA      *
+C method of third order and the improved EULER-CAUCHY method of  *
+C of second order.                                               *
+C[BE*)
+C The computed approximate solutions for the                     *
+C ordinary differential equation system at X + H are stored in   *
+C YHILO: Its first column contains the solution for the third    *
+C order method, while the second one has the second order solu-  *
+C tion.                                                          *
+C                                                                *
+C                                                                *
+C INPUT PARAMETERS:                                              *
+C =================                                              *
+C X       : DOUBLE PRECISION initial value for the integration   *
+C           step                                                 *
+C H       : DOUBLE PRECISION step size                           *
+C Y       : DOUBLE PRECISION vector Y(1:N), the initial condition*
+C           at X.                                                *
+C N       : number of differential equations in the system,      *
+C           or the size of Y:   0 < N < 13                       *
+C K       : 2-dim. DOUBLE PRECISION array K(1:12,1:3):           *
+C           If an integation step is repeated for an x-value,    *
+C           i.e., if NOSTEP = .TRUE., then the values K(1,1),...,*
+C           K(N,1) must be supplied by the calling program.      *
+C DES     : SUBROUTINE DES must be declared as EXTERNAL in the   *
+C           calling program. DES describes the system of         *
+C           differential equations and must have the following   *
+C           form:                                                *
+C                  SUBROUTINE DES(X,Y,N,YPUNKT)                  *
+C                  DOUBLE PRECISION Y(N),YPUNKT(N),X             *
+C                  YPUNKT(1)=....                                *
+C                  YPUNKT(2)=....                                *
+C                         .                                      *
+C                         .                                      *
+C                         .                                      *
+C                   YPUNKT(N)=....                               *
+C                   RETURN                                       *
+C                   END                                          *
+C NOSTEP  : LOGICAL variable indicating whether a new step is    *
+C           performed (NOSTEP = .FALSE.) or the step is repeated *
+C           with decreased step size.                            *
+C XZI     : DOUBLE PRECISION largest representable number for    *
+C           testing for OVERFLOW                                 *
+C                                                                *
+C                                                                *
+C OUTPUT PARAMETERS:                                             *
+C ==================                                             *
+C K       : 2-dim. DOUBLE PRECISION array K(1:12,1:M) containing *
+C           the K-values for the integration step                *
+C YHILO   : 2-dim. DOUBLE PRECISION array YHILO(1:12,1:2) con-   *
+C           taining the approximate solution at X + H            *
+C IERR    : error parameter: IERR=0  all is ok                   *
+C                            IERR=1  possible OVERFLOW           *
+C                                                                *
+C LOCAL VARIABLES:                                               *
+C ================                                               *
+C I       : loop variable                                        *
+C XDUMMY  : DOUBLE PRECISION auxiliary variable                  *
+C YDUMMY  : DOUBLE PRECISION vector XDUMMY(1:12)                 *
+C                                                                *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author   : Volker Krger                                      *
+C  Date     : 07.08.1990                                         *
+C  Source   : FORTRAN 77                                         *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+C Declarations
+C
+      DOUBLE PRECISION Y(N),YHILO(12,2),K(12,3),YDUMMY(12),X,H,
+     +                 XDUMMY,XZI
+C
+C Initialize LOGICAL Variable NOSTEP
+C
+      LOGICAL NOSTEP
+C
+C Initialize IERR
+C
+      IERR=0
+C
+C IF NOSTEP=.FALSE., we compute the K1 - values for the
+C system of differential equations.
+C Call SUBROUTINE DES, the K1 - values are in the first column
+C of K.
+C In case of OVERFLOW return to calling program.
+C
+      IF(.NOT. NOSTEP) THEN
+        CALL DES(X,Y,N,K(1,1))
+        DO 100 I=1,N
+           IF(DABS(K(I,1)) .GT. XZI) THEN
+              IERR=1
+              RETURN
+           ENDIF
+100     CONTINUE
+      ENDIF
+C
+C the K2 - values are now being computed.
+C Call SUBROUTINE DES, the K2 - values are in column two of K.
+C In case of detected OVERFLOW return to calling program.
+C
+      XDUMMY=X+0.5D0*H
+      DO 10 I=1,N
+         YDUMMY(I)=Y(I)+H*0.5D0*K(I,1)
+10    CONTINUE
+      CALL DES(XDUMMY,YDUMMY,N,K(1,2))
+      DO 110 I=1,N
+         IF(DABS(K(I,2)) .GT. XZI) THEN
+            IERR=1
+            RETURN
+         ENDIF
+110   CONTINUE
+C
+C Compute the K3 - values.
+C Call SUBROUTINE DES, the K3 - values will be in column three
+C of K.
+C In case of detected OVERFLOW we return to the calling program.
+C
+      XDUMMY=X+H
+      DO 20 I=1,N
+         YDUMMY(I)=Y(I)+H*(2.0D0*K(I,2)-K(I,1))
+20    CONTINUE
+      CALL DES(XDUMMY,YDUMMY,N,K(1,3))
+      DO 120 I=1,N
+         IF(DABS(K(I,3)) .GT. XZI) THEN
+            IERR=1
+            RETURN
+         ENDIF
+120   CONTINUE
+C
+C Compute the approximate solutions of third and
+C second order at X + H.
+C
+      DO 30 I=1,N
+         YHILO(I,1)=Y(I)+H*((K(I,1)+K(I,3))/6.0D0+2.0D0*
+     +              K(I,2)/3.0D0)
+         YHILO(I,2)=Y(I)+H*K(I,2)
+30    CONTINUE
+C
+C Return to calling program
+C
+      RETURN
+      END
+

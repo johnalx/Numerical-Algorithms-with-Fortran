@@ -1,0 +1,116 @@
+      PROGRAM TEST
+C
+C************************************************************
+C  Test program for SUBROUTINE MOCUBE            87/04/28   *
+C                                                           *
+C  The test program gives these results:                    *
+C                                                           *
+C[ INTERPOLATION POINTS:                                   ]*
+C[   .350000000000D+02   .500000000000D+01                 ]*
+C[   .350000000000D+02   .980000000000D+02                 ]*
+C[   .350000000000D+02   .980000000000D+02                 ]*
+C[   .330000000000D+02   .103000000000D+03                 ]*
+C[   .320000000000D+02   .106000000000D+03                 ]*
+C[   .280000000000D+02   .108000000000D+03                 ]*
+C[   .200000000000D+02   .108000000000D+03                 ]*
+C[                                                         ]*
+C[                                                         ]*
+C[ COEFFICIENTS OF THE CUBIC PARABOLAS OF THE BEZIER SPLINE]*
+C[   .350000000000D+02   .500000000000D+01                 ]*
+C[                                                         ]*
+C[   .349423076923D+02   .444380341880D+02                 ]*
+C[   .348846153846D+02   .838760683761D+02                 ]*
+C[   .350000000000D+02   .980000000000D+02                 ]*
+C[                                                         ]*
+C[   .351153846154D+02   .112123931624D+03                 ]*
+C[   .354038461538D+02   .100933760684D+03                 ]*
+C[   .350000000000D+02   .980000000000D+02                 ]*
+C[                                                         ]*
+C[   .345961538462D+02   .950662393162D+02                 ]*
+C[   .335000000000D+02   .100388888889D+03                 ]*
+C[   .330000000000D+02   .103000000000D+03                 ]*
+C[                                                         ]*
+C[   .325000000000D+02   .105611111111D+03                 ]*
+C[   .325961538462D+02   .105510683761D+03                 ]*
+C[   .320000000000D+02   .106000000000D+03                 ]*
+C[                                                         ]*
+C[   .314038461538D+02   .106489316239D+03                 ]*
+C[   .301153846154D+02   .107568376068D+03                 ]*
+C[   .280000000000D+02   .108000000000D+03                 ]*
+C[                                                         ]*
+C[   .258846153846D+02   .108431623932D+03                 ]*
+C[   .229423076923D+02   .108215811966D+03                 ]*
+C[   .200000000000D+02   .108000000000D+03                 ]*
+C[                                                         ]*
+C[   .348269230769D+02                                     ]*
+C[   .348269230769D+02                                     ]*
+C[   .123314102564D+03                                     ]*
+C[   .123314102564D+03                                     ]*
+C[   .356923076923D+02                                     ]*
+C[   .356923076923D+02                                     ]*
+C[   .897435897436D+02                                     ]*
+C[   .897435897436D+02                                     ]*
+C[   .324038461538D+02                                     ]*
+C[   .324038461538D+02                                     ]*
+C[   .105711538462D+03                                     ]*
+C[   .105711538462D+03                                     ]*
+C[   .326923076923D+02                                     ]*
+C[   .326923076923D+02                                     ]*
+C[   .105410256410D+03                                     ]*
+C[   .105410256410D+03                                     ]*
+C[   .288269230769D+02                                     ]*
+C[   .288269230769D+02                                     ]*
+C[   .108647435897D+03                                     ]*
+C[   .108647435897D+03                                     ]*
+C                                                           *
+C************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+C
+      PARAMETER (M=6)
+C
+      DIMENSION B(2,0:3*M),D(2,0:M)
+      DATA EPS/1.D-14/
+      DATA D/35.0D0,5.0D0,35.0D0,98.0D0,35.0D0,98.0D0,33.0D0,103.0D0,
+     +       32.0D0,106.0D0,28.0D0,108.0D0,20.0D0,108.0D0/
+C
+C     print test example
+C
+      WRITE (*,100)
+      DO 30 I=0,M
+   30    WRITE (*,200) D(1,I),D(2,I)
+      WRITE (*,300)
+      WRITE (*,300)
+C
+C     call MOCUBE, and compute the coefficients of the Bezier
+C     spline from the interpolation points
+C
+      CALL MOCUBE(D,B,M,EPS)
+C
+C     put out coefficients
+C
+      WRITE (*,400)
+      DO 20 I=0,3*M
+         WRITE (*,200) B(1,I),B(2,I)
+         IF (MOD(I,3) .EQ. 0) WRITE (*,300)
+   20    CONTINUE
+C
+C     output to check coefficients:
+C     the first two values must coincide; they are the x-value
+C     of the corresponding weight point.
+C     Ditto for the second set of values, the y-values 
+C     of the weight points
+C
+      DO 60 I=3,3*M-3,3
+         WRITE (*,500) -B(1,I-2)+2.0D0*B(1,I-1)
+         WRITE (*,500) 2.0D0*B(1,I+1)-B(1,I+2)
+         WRITE (*,500) -B(2,I-2)+2.0D0*B(2,I-1)
+   60    WRITE (*,500) 2.0D0*B(2,I+1)-B(2,I+2)
+      STOP
+ 100  FORMAT (1X, 'C[ INTERPOLATION POINTS:', T61, ']*')
+ 200  FORMAT (1X, 'C[', 2(D20.12), T61, ']*')
+ 300  FORMAT (1X, 'C[', T61, ']*')
+ 400  FORMAT (1X, 'C[ COEFFICIENTS OF THE CUBIC PARABOLAS OF THE ',
+     +            'BEZIER SPLINE', T61, ']*')
+ 500  FORMAT (1X, 'C[', D20.12, T61, ']*')
+      END

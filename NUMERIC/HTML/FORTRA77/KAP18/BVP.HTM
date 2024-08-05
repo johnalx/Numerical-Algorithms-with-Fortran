@@ -1,0 +1,372 @@
+<html>
+<head>
+<title>fortra77/kap18/bvp.for</title>
+</head>
+<body>
+<a name="anfang"</a>
+<hr>
+<a href="#ende">End of file</a><br>
+<a href="../../inhalt.htm#fortra77kap18bvpfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+<font size=+2>
+<pre>
+</pre><u><h1>F 18  Boundary Value Problems for Ordinary Differential   Equations</h1></u><pre>
+</pre><u><h1>F 18.2  Reduction of Boundary Value Problems to Initial Value   Problems</h1></u><pre>
+
+      SUBROUTINE  BVP  (A, B, H, YSTART, N, DEQ, BDCD, IPROC,
+     1                  EPSIVP, EPSBC, IFMAX, ITMAX, ITER, IERR,
+<a name="BVP13"</a>     2                  AUXF, LDF, WORK1, WORK21, WORK22, WORK23)
+C
+C*****************************************************************
+C                                                                *
+C  This program is designed to solve a general first order       *
+C  boundary value problem given in system form as                *
+C                                                                *
+C    Y' = F(X,Y)  for  A &lt;= X &lt;= B  with   R(Y(A), Y(B)) = 0.    *
+C                                                                *
+C  It uses the shooting method to determine an approximation     *
+C  YSTART for the correct initial value Y(A), which then can be  *
+C  used to find the solution Y using an initial value problem    *
+C  solver via the SUBROUTINE IVP. Here IPROC serves as a label   *
+C  to select the desired initial value problem solver of IVP.    *
+C  The non-linear system of equations that occurs in the         *
+C  shooting method is solved by  NEWTON's method.                *
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  A      - left endpoint of the interval of integration         *
+C  B      - right endpoint of the interval; B must be > A        *
+C  H      - appropriate starting step size for the approximate   *
+C           solution of the associated initial value problem for *
+C           the shooting method                                  *
+C  YSTART - starting approximation for the initial value Y(A) of *
+C           the solution Y of the boundary value problem         *
+C  N      - number of differential equations with N > 1 and:     *
+C           for IPROC = 1 :         N &lt;= 20;                     *
+C                     = 2, 4 or 5 : N &lt;= 100;                    *
+C                     = 3 :         N &lt;= 12.                     *
+C  DEQ    - right-hand side of the differential equation, i.e.,  *
+C           the inhomogeneity, that has to be provided as a      *
+C           SUBROUTINE in the form                               *
+C              SUBROUTINE DEQ (X, Y, N, F)                       *
+C           (beginning with: DOUBLE PRECISION Y(N), F(N)).       *
+C           In it F denotes the inhomogeneity of the differential*
+C           equation at (X,Y). In the calling program DEQ has to *
+C           be declared as EXTERNAL.                             *
+C  BDCD   - boundary condition that has to be provided as a      *
+C           SUBROUTINE of the form                               *
+C              SUBROUTINE BDCD (YA, YB, N, R)                    *
+C           (starting with: DOUBLE PRECISION YA(N), YB(N), R(N)).*
+C           Here R denotes the value of R(YA,YB). In the calling *
+C           program BDCD has to be listed as EXTERNAL.           *
+C  IPROC  - label to select the initial value problem solver     *
+C           to be used inside the shooting algorithm:            *
+C           = 1 : Runge-Kutta embedding formula of 4th/5th order *
+C                 (England formula) from the subroutine IVP;     *
+C                 Restriction: 1 &lt; N &lt;= 20 .                     *
+C           = 2 : Predictor-corrector method of 4th order of     *
+C                 Adams-Bashforth-Moulton (subroutine DESABM;    *
+C                 constant IFMAX set to 1000; needs auxiliary    *
+C                 array AUXF ).                                  *
+C           = 3 : Runge-Kutta embedding formula of 7th/8th order *
+C                 (subroutine RKTRB; 1 &lt; N &lt;= 12 ; IFMAX = 10000)*
+C           = 4 : Extrapolation method of Bulirsch-Stoer;        *
+C                 (subroutine DESEXT; IFMAX = 1400; auxiliary    *
+C                 array  AUXF ).                                 *
+C           = 5 : implicit Runge-Kutta-Gauss method;             *
+C                 (subroutine IRKDRV; IFMAX = 200000, auxiliary  *
+C                 arrays  WORK1 , WORK21 , WORK22  and WORK23 ). *
+C  EPSIVP - accuracy bound for the approximate solution of the   *
+C           corresponding initial value problems for the shooting*
+C           method.                                              *
+C  EPSBC  - accuracy bound for the approximation YSTART for Y(A) *
+C           in the boundary condition.                           *
+C  IFMAX  - upper bound for the number of allowed functional     *
+C           evaluations of the right-hand side F while solving   *
+C           an associated initial value problem.                 *
+C           (concerns only IPROC = 1; otherwise set as follows:  *
+C           if IPROC = 2 : IFMAX =   1000;                       *
+C                    = 3 : IFMAX =  10000;                       *
+C                    = 4 : IFMAX =   1400;                       *
+C                    = 5 : IFMAX = 200000. )                     *
+C  ITMAX  - upper bound for the number of NEWTON-iterations while*
+C           solving the non-linear system of equations in the    *
+C           shooting method.                                     *
+C  AUXF   - array of size (1:LDF,1:12) where LDF >= N ; auxiliary*
+C           array for IPROC = 2 or 4                             *
+C  LDF    - leading dimension of AUXF; defined in calling program*
+C  WORK1  - vector of length (1:5*N+78) ; used for IPROC = 5.    *
+C  WORK21 - array of size (1:N,1:N) ; used for IPROC = 5.        *
+C           bei der Wahl IPROC = 5                               *
+C  WORK22 - array of size (1:N+9,1:9) ; for IPROC = 5.           *
+C  WORK23 - array of size (1:2*N+10,1:10) ; for IPROC = 5.       *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  ==================                                            *
+C  YSTART - approximation for the initial value Y(A) of the      *
+C           solution Y of the boundary value problem             *
+C  ITER   - number of NEWTON-iterations actually performed       *
+C  IERR   - error parameter:                                     *
+C           = 0: everything o.k.                                 *
+C           = 1: at least one of the error parameters EPS... is  *
+C                too small    (relative to machine constant)     *
+C           = 2: B &lt;= A       (within the machine constant)      *
+C           = 3: step width H &lt;= 0                               *
+C                             (relative to machine constant)     *
+C           = 4: N > NMAX or N &lt;= 0 where                        *
+C                    NMAX = 20  , for IPROC = 1                  *
+C                    NMAX = 100 , for IPROC = 2 , 4 or 5         *
+C                    NMAX = 12  , for IPROC = 3 .                *
+C           = 5: IPROC &lt;= 0 or IPROC > 5                         *
+C           = 6: IFMAX function evaluations are not sufficient   *
+C                for approximately solving the associated initial*
+C                value problem with the shooting method.         *
+C           = 7: ITER > ITMAX: the number of allowed NEWTON-     *
+C                iterations is not sufficient to determine an    *
+C                approximate initial value YSTART within the     *
+C                desired accuracy.                               *
+C           = 8: the JACOBI matrix for the NEWTON method is      *
+C                numerically singular; it is impossible to       *
+C                perform a NEWTON-iteration step.                *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  required directory (for IPROC = 5): directory number 9        *
+C                                                                *
+C  required subroutines: GAUSS, MACHPD and, depending on IPROC:  *
+C                        one of: IVP, DESABM, RKTRB, DESEXT, or  *
+C                                IRKDRV                          *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author   : Klaus Niederdrenk                                  *
+C  date     : 11.01.1985 / 5.31.1994                             *
+C  source   : FORTRAN 77                                         *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DIMENSION YSTART(N)
+      DIMENSION AMAT(100,100),YK(100),YK1(100),YAJ(100),R(100)
+      DIMENSION RJ(100),D(100),SCAL(100)
+      DIMENSION WOR1RK(4),WOR2RK(16,16),IWORRK(2),IFLARK(3)
+      DIMENSION AUXF(LDF,12)
+      DIMENSION WORK1(5*N+78),WORK21(N,N),WORK22(N+9,9)
+      DIMENSION WORK23(2*N+10,10),G(100)
+      DIMENSION IPIVOT(100)
+      EXTERNAL DEQ
+C
+C** FMACHP is the machine constant of the computer being used
+C** EPS1 serves as a step size bound for forming the approximate Jacobi
+C** matrix for the Newton method. 
+C** EPS2 is used to find quantities sufficiently close to zero.
+C
+      FMACHP = 1.0D0
+  10  FMACHP = 0.5D0 * FMACHP
+      IF (MACHPD(1.0D0 + FMACHP) .EQ. 1) GOTO 10
+      FMACHP = 2.0D0 * FMACHP
+      EPS1 = DSQRT (FMACHP)
+      EPS2 = 100.0D0 * FMACHP
+C
+C** Check input parameters
+C
+      IERR = 0
+      IF (EPSBC .LT. EPS2) THEN
+        IERR = 1
+      ELSE IF (B .LE. A) THEN
+        IERR = 2
+      ELSE IF (H .LT. EPS2*DABS(A)) THEN
+        IERR = 3
+      ELSE IF (IPROC .EQ. 1) THEN
+        IF (N .LE. 0 .OR. N .GT. 20) IERR = 4
+      ELSE IF (IPROC .EQ. 2 .OR. IPROC .EQ. 4 .OR. IPROC .EQ. 5) 
+     +  THEN
+        IF (N .LE. 0 .OR. N .GT. 100) IERR = 4
+      ELSE IF (IPROC .EQ. 3) THEN
+        IF (N .LE. 0 .OR. N .GT. 12) IERR = 4
+      ELSE IF (IPROC .LE. 0 .OR. IPROC .GT. 5) THEN
+        IERR = 5
+      ENDIF
+      IF (IERR .NE. 0) R E T U R N
+C
+C** Preassign local parameters
+C
+      DATA  G / 100*1.0D0 /
+      ITER = 0
+      EPSABS = 0.5D0 * EPSIVP
+      EPSREL = EPSABS
+      IND = 1
+      IFLARK(1) = 11
+      IFLARK(2) = 0
+      IFLARK(3) = 0
+      IFLRKG = 1
+C
+C** in case  YSTART  is a sufficiently good approximation
+C** of Y(A) : Return
+C
+  50  CONTINUE
+      DO 60 I = 1, N
+        YK(I) = YSTART(I)
+  60  CONTINUE
+      XK = A
+      HK = H
+C
+      IF (IPROC .EQ. 1) THEN
+        CALL IVP(XK,HK,YK,N,DEQ,B,EPSABS,EPSREL,1,IFMAX,IFA,IFEHL)
+        IF (IFEHL .EQ. 5) IERR = 6
+      ELSE IF (IPROC .EQ. 2) THEN
+        IFEHL = 0
+        CALL DESABM(XK,YK,DEQ,N,B,HK,B-A,EPSABS,EPSREL,IND,
+     +               IFEHL,AUXF,LDF)
+        IF (IFEHL .EQ. 2 .OR. IFEHL .EQ. 3) THEN
+          HK = B - XK
+          IFEHL = 0
+          CALL DESABM(XK,YK,DEQ,N,B,HK,B-XK,EPSABS,EPSREL,IND,
+     +                 IFEHL,AUXF,LDF)
+          IF (IFEHL .EQ. 2) IERR = 6
+        ENDIF
+      ELSE IF (IPROC .EQ. 3) THEN
+        CALL RKTRB(XK,B,N,DEQ,YK,EPSABS,EPSREL,IFLARK,WOR1RK,
+     +              WOR2RK,IWORRK,IFEHL)
+        IFLARK(3) = 1
+        WOR1RK(4) = H
+        IF (IFEHL .EQ. -2) IERR = 6
+      ELSE IF (IPROC .EQ. 4) THEN
+        IFEHL = 0
+        CALL DESEXT(XK,YK,DEQ,N,B,HK,B-A,EPSABS,EPSREL,
+     +               IFEHL,AUXF,LDF)
+        IF (IFEHL .EQ. 1 .OR. IFEHL .EQ. 2) THEN
+          HK = B - XK
+          IFEHL = 0
+          CALL DESEXT(XK,YK,DEQ,N,B,HK,B-XK,EPSABS,EPSREL,
+     +                 IFEHL,AUXF,LDF)
+          IF (IFEHL .EQ. 1) IERR = 6
+        ENDIF
+      ELSE
+        DO 65 I = 1, N
+          YK1(I) = YK(I)
+  65    CONTINUE
+        CALL IRKDRV(DEQ,N,10,IFLRKG,9,0,0,IFEHL,FMACHP,
+     +               EPSIVP,G,XK,B,YK1,YK,WORK1,WORK21,WORK22,
+     +               WORK23)
+        IFLRKG = 0
+        IF (IFEHL .NE. 0) IERR = 6
+      ENDIF
+C
+      IF (IERR .NE. 0)  R E T U R N
+C
+      CALL BDCD (YSTART, YK, N, R)
+C
+      RMAX = 0.0D0
+      DO 70 K = 1, N
+        RMAX = DMAX1 (RMAX, DABS(R(K)))
+  70  CONTINUE
+      IF (RMAX .LT. EPSBC)  R E T U R N
+C
+C** If  ITMAX  NEWTON iterations have been performed
+C** without finding a sufficiently good approximation 
+C** YSTART for Y(A): Return
+C
+      ITER = ITER + 1
+      IF (ITER .GT. ITMAX) THEN
+        IERR = 7
+        R E T U R N
+      ENDIF
+C
+C** Find a better approximation YSTART for
+C** Y(A) via NEWTON's method. Form the JACOBI
+C** matrix AMAT approximately from onesided 
+C** difference quotients
+C
+      DO 100 JACOBI = 1, N
+        DO 80 I = 1, N
+          YK(I) = YSTART(I)
+          YAJ(I) = YK(I)
+  80    CONTINUE
+        IF (DABS(YK(JACOBI)) .LT. EPS2) THEN
+          YK(JACOBI) = YK(JACOBI) + EPS1
+          DELTA = 1.0D0 / EPS1
+        ELSE
+          YK(JACOBI) = YK(JACOBI) * (1.0D0 + EPS1)
+          DELTA = 1.0D0 / (EPS1 * YK(JACOBI))
+        ENDIF
+        YAJ(JACOBI) = YK(JACOBI)
+        XK = A
+        HK = H
+C
+      IF (IPROC .EQ. 1) THEN
+        CALL IVP(XK,HK,YK,N,DEQ,B,EPSABS,EPSREL,1,IFMAX,IFA,IFEHL)
+        IF (IFEHL .EQ. 5) IERR = 6
+      ELSE IF (IPROC .EQ. 2) THEN
+        IFEHL = 0
+        CALL DESABM(XK,YK,DEQ,N,B,HK,B-A,EPSABS,EPSREL,IND,
+     +               IFEHL,AUXF,LDF)
+        IF (IFEHL .EQ. 2 .OR. IFEHL .EQ. 3) THEN
+          HK = B - XK
+          IFEHL = 0
+          CALL DESABM(XK,YK,DEQ,N,B,HK,B-XK,EPSABS,EPSREL,IND,
+     +                 IFEHL,AUXF,LDF)
+          IF (IFEHL .EQ. 2) IERR = 6
+        ENDIF
+      ELSE IF (IPROC .EQ. 3) THEN
+        CALL RKTRB(XK,B,N,DEQ,YK,EPSABS,EPSREL,IFLARK,WOR1RK,
+     +              WOR2RK,IWORRK,IFEHL)
+        WOR1RK(4) = H
+        IF (IFEHL .EQ. -2) IERR = 6
+      ELSE IF (IPROC .EQ. 4) THEN
+        IFEHL = 0
+        CALL DESEXT(XK,YK,DEQ,N,B,HK,B-A,EPSABS,EPSREL,
+     +               IFEHL,AUXF,LDF)
+        IF (IFEHL .EQ. 1 .OR. IFEHL .EQ. 2) THEN
+          HK = B - XK
+          IFEHL = 0
+          CALL DESEXT(XK,YK,DEQ,N,B,HK,B-XK,EPSABS,EPSREL,
+     +                 IFEHL,AUXF,LDF)
+          IF (IFEHL .EQ. 1) IERR = 6
+        ENDIF
+      ELSE
+        DO 85 I = 1, N
+          YK1(I) = YK(I)
+  85    CONTINUE
+        CALL IRKDRV(DEQ,N,10,IFLRKG,9,0,0,IFEHL,FMACHP,
+     +               EPSIVP,G,XK,B,YK1,YK,WORK1,WORK21,WORK22,
+     +               WORK23)
+        IF (IFEHL .NE. 0) IERR = 6
+      ENDIF
+C
+        IF (IERR .NE. 0)  R E T U R N
+C
+        CALL BDCD (YAJ, YK, N, RJ)
+C
+        DO 90 K = 1, N
+          AMAT(K,JACOBI) = (RJ(K) - R(K)) * DELTA                            
+  90    CONTINUE
+ 100  CONTINUE
+C
+      CALL GAUSS (N, AMAT, 100, R, D, IFLAG, SCAL, IPIVOT)
+C
+C** Return if the JACOBI matrix is singular
+C
+      IF (IFLAG .EQ. 0) THEN
+        IERR = 8
+        R E T U R N
+      ENDIF
+C
+      DO 110 I = 1, N
+        YSTART(I) = YSTART(I) - D(I)
+ 110  CONTINUE
+      GOTO 50
+      END
+</font>
+</pre>
+<a name="ende"</a>
+<hr>
+<a href="#anfang">Begin of file</a><br>
+<a href="../../inhalt.htm#fortra77kap18bvpfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+</body>
+</html>

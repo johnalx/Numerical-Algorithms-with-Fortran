@@ -1,0 +1,183 @@
+<html>
+<head>
+<title>fortra77/kap12/bsplfl.for</title>
+</head>
+<body>
+<a name="anfang"</a>
+<hr>
+<a href="#ende">End of file</a><br>
+<a href="../../inhalt.htm#fortra77kap12bsplflfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+<font size=+2>
+<pre>
+
+
+
+</pre><u><h1>F 12.4.2  B-Spline Surfaces</h1></u><pre>
+
+<a name="BSPFLAE7"</a>      SUBROUTINE BSPLFL (KK,NU,NV,M,N,KU,KV,KVU,KVV,DP,XP,UPOL,D1,D0
+     f ,E1,E0,HILF,X,IERR)
+
+C********************************************************************
+C                                                                   *
+C   This subroutine generates a mesh for a b spline surface from    *
+C   given u and v curves.                                           *
+C                                                                   *
+C   INPUT PARAMETERS                                                *
+C   ================                                                *
+C   KK      : Order                                                 *
+C   NU      : Number of nodes on a u curve, NU >= 2; NU - 1 denotes * 
+C             the number of u intervals                             *
+C   NV      : Number of nodes on a v curve, NV >= 2; NV - 1 denotes * 
+C             the number of v intervals                             *
+C   M       : M+1 is the number of v polygons; M >= 2               *
+C   N       : N+1 is the number of u polygons; N >= 2               *
+C   KU      : Order of the u curves, 2 &lt;= KU &lt;= M+1                 *
+C   KV      : Order of the V curves, 2 &lt;= KV &lt;= N+1                 *
+C   KVU     : INTEGER vector KVU(1:KU+M-1); the node vector KVU for *
+C             the open u curves of order KU                         *
+C   KVV     : INTEGER vector KVV(1:KV+N-1); the node vector KVV for *
+C             the open v curves of order KV                         *
+C   DP      : 3 dimensional DOUBLE PRECISION array DP(0:M,0:N,1:KK) *
+C             containing the DE BOOR polytope with the u and v poly-*
+C             gons                                                  *
+C                                                                   *
+C                                                                   *
+C   AUX ARRAYS                                                      *
+C   ===========                                                     *
+C   UPOL   : 2 dim. DOUBLE PRECISION array UPOL(1:M,1:KK)           *
+C   D0,E0  : 2 dim. DOUBLE PRECISION arays ..(1:KU,1:KK)            *
+C   D1,E1  : 2 dim. DOUBLE PRECISION arrays ..(1:KV,1:KK)           *
+C   DUMMY  : 2 dim. DOUBLE PRECISION array DUMMY(0:N,1:KK)          *
+C   X      : DOUBLE PRECISION vector X(1:KK)                        *
+C                                                                   *
+C                                                                   *
+C   OUTPUT PARAMETERS                                               *
+C   =================                                               *
+C   XP      : 3 dim. DOUBLE PRECISION array XP(1:N,1:NN,1:KK) with  *
+C             the generated mesh points                             * 
+C   IERR    : Error parameter                                       *
+C             IERR=0 : all is ok                                    *
+C             IERR=1 : invalid input                                *
+C                                                                   *
+C-------------------------------------------------------------------*
+C                                                                   *
+C   Required subroutines:   DEBOOR, KNOTVO                          *
+C                                                                   *
+C********************************************************************
+C                                                                   *
+C   Authors    : Reinhold Wodicka, Bjoern Terwege                   *
+C   Date       : 6.12.1995                                          *
+C   Sourcecode : FORTRAN 77                                         *
+C                                                                   *
+C********************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DIMENSION DP(0:M,0:N,1:KK),KVU(1:KU+M-1),KVV(1:KV+N-1),
+     f   XP(1:NU,1:NV,1:M),X(1:KK),UPOL(0:M,1:KK),D1(1:KV,1:KK),
+     f   E1(1:KV,1:KK),D0(1:KU,1:KK),E0(1:KU,1:KK),HILF(0:N,1:KK)
+c
+c  Stopping criteria:
+c
+      IERR=0
+      IF(NU.LT.2.OR.NV.LT.2.OR.M.LT.2.OR.N.LT.2) THEN
+         IERR=1
+         RETURN
+      ENDIF
+c
+c  Compute node vectors
+c
+      CALL KNOTVO(N,KV,KVV)
+      CALL KNOTVO(M,KU,KVU)
+c
+c  Compute stepsizes
+c
+      DU=DBLE(M+2-KU)/DBLE(NU-1)
+      DV=DBLE(N+2-KV)/DBLE(NV-1)
+c
+c  Starting parameter
+c
+      VJ=DBLE(KV-1)
+c
+c  Starting index
+c
+      IS=KV-1
+      DO 10 J=1,NV
+c
+c  Generate one u curve for each vj, j=1, ...., Nv
+c
+        DO 20 L=0,M
+c
+c  Start by constructing a u polygon for vj
+c
+c  Prepare v polygon by storing separately
+c
+           DO 1 L1=0,N
+             DO 2 L2=1,KK
+                HILF(L1,L2)=DP(L,L1,L2)
+2            CONTINUE
+1          CONTINUE
+           CALL DEBOOR(N,KK,HILF,KV,KVV,VJ,IS,D1,E1,X,IERR)
+           DO 22 II=1,3
+              UPOL(L,II)=X(II)
+22         CONTINUE
+20      CONTINUE
+c
+c  v polygon uPol has been computed; it shall be used for the u curve
+c
+c
+c  Starting parameter
+c
+        UI=DBLE(KU-1)
+c
+c  Starting index
+c
+        IR=KU-1
+        DO 30 I=1,NU
+           CALL DEBOOR(M,KK,UPOL,KU,KVU,UI,IR,D0,E0,X,IERR)
+           DO 33 II=1,KK
+              XP(I,J,II)=X(II)
+33         CONTINUE
+c
+c  nex parameter, m+1 is the maximal u parameter
+c
+           UI=DMIN1(UI+DU,DBLE(M+1))
+c
+c  Find next index
+c
+35         IF(UI.GT.IR+1) THEN
+               IR=IR+1
+               GOTO 35
+           ENDIF
+30      CONTINUE
+c
+c  Nu points of the u curve for v = vj have been found
+c
+c
+c  next v parameter;  n+1 is  maximal v parameter
+c
+        VJ=DMIN1(VJ+DV,DBLE(N+1))
+c
+c  Find next index
+c
+40      IF(VJ.GT.IS+1) THEN
+           IS=IS+1
+           GOTO 40
+        ENDIF
+c
+c  Nv u curves have been computed
+c
+10    CONTINUE
+      RETURN
+      END
+</font>
+</pre>
+<a name="ende"</a>
+<hr>
+<a href="#anfang">Begin of file</a><br>
+<a href="../../inhalt.htm#fortra77kap12bsplflfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+</body>
+</html>

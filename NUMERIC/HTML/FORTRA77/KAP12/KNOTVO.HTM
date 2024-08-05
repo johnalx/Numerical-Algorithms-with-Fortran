@@ -1,0 +1,69 @@
+<html>
+<head>
+<title>fortra77/kap12/knotvo.for</title>
+</head>
+<body>
+<a name="anfang"</a>
+<hr>
+<a href="#ende">End of file</a><br>
+<a href="../../inhalt.htm#fortra77kap12knotvofor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+<font size=+2>
+<pre>
+
+<a name="KNOTVO3"</a>      SUBROUTINE KNOTVO (N,K,KV)
+C
+C*****************************************************************
+C                                                                *
+C                                                                *
+C   This program computes the node vector KV of an open uniform  *
+C   B spline.                                                    *
+C                                                                *
+C   INPUT PARAMETERS                                             *
+C   ================                                             *
+C   N       : N+1 is the number of DE BOOR points, N >= 2        *
+C   K       : degree of the B spline curve, 3 &lt;= K &lt;= N+1        *
+C                                                                *
+C   OUTPUT PARAMETERS                                            *
+C   =================                                            *
+C   KV      : INTEGER vector KV(1:N+K+1), with the node vector   *
+C             of order K                                         *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C   Required subroutines: none                                   *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author      : Gisela Engeln-Mue&uuml;llge                           *
+C  Date        : 11.30.91                                        *
+C  Source code : FORTRAN 77                                      *
+C                                                                *
+C*****************************************************************
+C
+      INTEGER KV(1:N+1+K)
+C
+C      Create the node vector KV of an open uniform B spline
+C
+      DO 10 J=1,K-1
+         KV(J)=K-1
+  10  CONTINUE
+      DO 20 J=K,N
+         KV(J)=J
+  20  CONTINUE
+      DO 30 J=N+1,N+K-1
+         KV(J)=N+1
+  30  CONTINUE
+      RETURN
+      END
+</font>
+</pre>
+<a name="ende"</a>
+<hr>
+<a href="#anfang">Begin of file</a><br>
+<a href="../../inhalt.htm#fortra77kap12knotvofor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+</body>
+</html>

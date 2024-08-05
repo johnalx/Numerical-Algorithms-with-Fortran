@@ -1,0 +1,64 @@
+C[BA*)
+C[LE*)
+      SUBROUTINE SLPRE (X, W, IWFL, FCT, LDA, M, N, F, A)
+C[IX{SLPRE}*)
+C
+C*****************************************************************
+C                                                                *
+C  The SUBROUTINE SLPRE forms the matrix A made up of function   *
+C  values as needed for a discrete linear least square problem.  *
+C[BE*)
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  -----------------                                             *
+C                                                                *
+C  The parameters X, W, IWFL, FCT, LDA, M, and N are of the same *
+C  as those in SUBROUTINE SLFIT                                  *
+C                                                                *
+C                                                                *
+C  AUXILIARY PARAMETERS:                                         *
+C  ---------------------                                         *
+C                                                                *
+C  F  (N+1)-vector F(0:N) used for calling SUBROUTINE  FCT       *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETER:                                             *
+C  -----------------                                             *
+C                                                                *
+C  A  2-dim. array A(0:LDA,0:N) containing the values of the     *
+C     model functions:                                           *
+C     A(I,K) = value of the K-th model function at node X(I)     *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author   : Ilona Westermann                                   *
+C  date     : 09.01.1987                                         *
+C  source   : FORTRAN 77                                         *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DIMENSION A(0:LDA,0:N), F(0:N), X(0:M), W(0:M)
+      IF (IWFL .EQ. 0) THEN
+         DO 10 I=0,M
+            WI = DSQRT(W(I))
+            CALL FCT (X(I), N, F)
+            DO 10 K=0,N
+               A(I,K) = F(K) * WI
+   10    CONTINUE
+      ELSE
+         DO 20 I=0,M
+            CALL FCT (X(I), N, F)
+            DO 20 K=0,N
+               A(I,K) = F(K)
+   20    CONTINUE
+      ENDIF
+      RETURN
+      END

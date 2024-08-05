@@ -1,0 +1,302 @@
+<html>
+<head>
+<title>fortra77/kap17/irkdrv.for</title>
+</head>
+<body>
+<a name="anfang"</a>
+<hr>
+<a href="#ende">End of file</a><br>
+<a href="../../inhalt.htm#fortra77kap17irkdrvfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+<font size=+2>
+<pre>
+
+
+
+</pre><u><h1>F 17.3.5  Implicit Runge-Kutta Methods of Gaussian Type</h1></u><pre>
+
+<a name="IRKDRV9"</a>      SUBROUTINE IRKDRV (DES,N,MMAX,IFLAG,LUNIN,LUNOUT,LUNPR,IERR,
+     1                   EPSM,EPS,G,X0,XEND,Y0,YQ,
+     2                   WORK1,WORK21,WORK22,WORK23)
+C
+C*****************************************************************
+C                                                                *
+C IRKDRV solves an initial value problem (IVP) with N            *
+C differential equations of 1st order.                           *
+C The IVP is solved by the implicit RUNGE-KUTTA method (IRKV).   *
+C In it both step size control and a control of the order of the *
+C IRKV is used. The nodes for the IRKV are stored in a file,     *
+C numbered LUNIN. This file can be produced by the SUBROUTINE    *
+C IRKCOE.                                                        *
+C SUBROUTINE IRKDRV is only a driver routine for providing       *
+C storage space, for testing of the input parameters and for     *
+C calling two subroutines according to the setting of the        *
+C parameter IFLAG:                                               *
+C IFLAG=0       : We only solve the SVP. We assume that the node *
+C                 file already exists.                           *
+C IFLAG=1       : Before solving the IVP we must produce the node*
+C                 file numbered LUNIN, by SUBROUTINE IRKCOE.     *
+C                                                                *
+C The solution of the IVP is found in the SUBROUTINE IMRUKU.     *
+C A description of the algorithm used can be found there.        *
+C                                                                *
+C                                                                *
+C INPUT PARAMETERS:                                              *
+C =================                                              *
+C DES     : name of a subroutine, that represents the system of  *
+C           differential equations. This subroutine has to be    *
+C           declared as EXTERNAL in the calling program. It has  *
+C           the form:                                            *
+C                 SUBROUTINE DES (N,X,Y,F)                       *
+C                 INTEGER N                                      *
+C                 DOUBLE PRECISION X, Y(N), F(N)                 *
+C                 F(1) = F1(X,Y(1),Y(2),...,Y(N))                *
+C                 F(2) = F2(X,Y(1),Y(2),...,Y(N))                *
+C                 -------------------------------                *
+C                 F(N) = FN(X,Y(1),Y(2),...,Y(N))                *
+C                 RETURN                                         *
+C                 END                                            *
+C N       : The number of differential equations                 *
+C MMAX    : maximally allowed order, i.e. the highest order for  *
+C           which coefficients are available in an auxiliary     *
+C           file addressed at LUNIN. MMAX has to be >= 5.        *
+C           It is not advisable to chose the maximum order NMAX  *
+C           too high, since the quality of this procedure        *
+C           strongly depends on the machine constant. E.g. on a  *
+C           CONTROL DATA CYBER 175 with a DOUBLE PRECISION       *
+C           machine constant of 2.5D-29, chosing NMAX = 12 has   *
+C           proved adequate at the Computer center of the RWTH   *
+C           Aachen. For other machines a larger MMAX may well be *
+C           meaningful.                                          *
+C IFLAG   : =0; solve the IVP only.                              *
+C           =1; before solving the IVP, we must produce the node *
+C               file. The generated nodes are the GAUSS-LEGENDRE *
+C               nodes.                                           *
+C LUNIN   : number of the file that contains the nodes for all   *
+C           IRKMs up to order MMAX.                              *
+C           This file can be produced by the SUBROUTINE IRKCOE.  *
+C LUNOUT  : if output of intermediate points is desired (as de-  *
+C           termined by the algorithm), a file with number LUNOUT*
+C           is created for any LUNOUT > 0. If LUNOUT=0, there is *
+C           no output.                                           *
+C LUNPR   : >0; create a log file under number LUNPR, which      *
+C               contains intermediate results and the algorithm  *
+C               flow log.                                        *
+C           =0; no output                                        *
+C EPSM    : DOUBLE PRECISION machine constant                    *
+C           If EPSM &lt;= 0, the machine constant is taken from     *
+C           IRKDVR.                                              *
+C EPS     : desired relative accuracy                            *
+C G       : vector G(1:N); the weights G(I) allow varied weighing*
+C                          of the components Y(I) with respect to*
+C                          the machine constant EPS. If all com- *
+C                          ponents are to have the same weight,  *
+C                          then G(I)=1 is chosen for all I.      *
+C                          W A R N I N G:                        *
+C                          If G(I)=0 for one I, division by zero *
+C                          could occur if the corresponding      *
+C                          components of the partial derivatives *
+C                          on the right hand side are equal to   *
+C                          zero. The program will not cover for  *
+C                          this terminal error!                  *
+C X0      : lower limit of the integration interval              *
+C XEND    : upper limit of the integration interval              *
+C Y0      : vector Y0(1:N); initial values Y(X0) at X0           *
+C WORK1   : auxiliary vector WORK1(1:8*MMAX+5*N-2)               *
+C WORK21  : 2-dimensional auxiliary array WORK21(1:N,1:N)        *
+C WORK22  : 2-dimensional auxiliary array                        *
+C           WORK22(1:N+MMAX-1,1:MMAX-1)                          *
+C WORK23  : 2-dimensional auxiliary array                        *
+C           WORK23(1:2*N+MMAX,1:MMAX)                            *
+C                                                                *
+C                                                                *
+C OUTPUT PARAMETERS:                                             *
+C ==================                                             *
+C IERR    : error parameter                                      *
+C           =0; run was successful                               *
+C           =1; no convergence. Possible remedy: increase the    *
+C               maximal order MMAX.                              *
+C           =2; wrong input parameter(s)                         *
+C EPS     : estimate for the largest local relative error        *
+C YQ      : vector YQ(1:N); approximation for the solution of    *
+C           the IVP.                                             *
+C                                                                *
+C                                                                *
+C LOCAL VARIABLES:                                               *
+C ================                                               *
+C I       : loop variable                                        *
+C FMACHP  : auxiliary variable for determining the machine       *
+C           constant                                             *
+C ZERO    : logic variable                                       *
+C           =.TRUE. ,if G(I)=0 for all I                         *
+C           =.FALSE. otherwise                                   *
+C                                                                *
+C                                                                *
+C All other local variables are INTEGER variables and serve for  *
+C subdividing the auxiliary arrays for the subroutines:          *
+C                                                                *
+C IFAC, IDELTK, IHEPS, IALPH, IALPHQ, IA, IAQ, IF0, IF1, IDFDX,  *
+C IY, IYOLD, IDBLK, IBETA, IBETAQ, IDBLKQ, IDB, IC.              *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: IRKCOE, IMRUKU, IRKRT, GALE0, MACHPD    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author   : Thomas Eul                                         *
+C  date     : 09.17.1985                                         *
+C  source   : FORTRAN 77                                         *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+C
+C     parameters
+C
+      EXTERNAL DES
+      INTEGER   N, MMAX, IFLAG, LUNIN, LUNOUT, LUNPR, IERR
+      DIMENSION G(N), Y0(N), YQ(N),
+     1          WORK1(8*MMAX+5*N-2), WORK21(N,N),
+     2          WORK22(N+MMAX-1,MMAX-1), WORK23(2*N+MMAX,MMAX)
+      DOUBLE PRECISION EPSM, EPS, X0, XEND
+C
+C     local variables
+C
+      LOGICAL ZERO
+      INTEGER I, IFAC, IDELTK, IHEPS, IALPH, IALPHQ, IA, IAQ,
+     1        IF0, IF1, IDFDX, IY, IYOLD, IDBLK, IBETA, IBETAQ,
+     2        IDBLKQ, IDB, IC ,IHELP, IBETA2, IDBKQ2, IDB2
+      DOUBLE PRECISION FMACHP
+C
+C*****************************************************************
+C*               testing the input parameters                    *
+C*****************************************************************
+C
+      I = 1
+      ZERO = .TRUE.
+   10 CONTINUE
+         IF (G(I) .NE. 0.0D0) ZERO = .FALSE.
+         I = I + 1
+      IF (ZERO .AND. I .LE. N) GOTO 10
+C
+      IF (N .LE. 0 .OR. MMAX .LE. 4 .OR. LUNIN .LE. 0 .OR.
+     1    LUNOUT .LT. 0 .OR. LUNPR .LT. 0 .OR. EPS .LE. 0.0D0 .OR.
+     2    ZERO .OR. IFLAG .LT. 0 .OR. IFLAG .GT. 1) THEN
+         IERR = 2
+      ELSE
+C
+C*****************************************************************
+C*  determine the addresses for subdividing the auxiliary arrays *
+C*****************************************************************
+C
+         IFAC   = 1
+         IDELTK = IFAC   + MMAX
+         IHEPS  = IDELTK + 2*MMAX
+         IALPH  = IHEPS  + MMAX
+         IALPHQ = IALPH  + MMAX-1
+         IA     = IALPHQ + MMAX
+         IAQ    = IA     + MMAX-1
+         IF0    = IAQ    + MMAX
+         IF1    = IF0    + N
+         IDFDX  = IF1    + N
+         IY     = IDFDX  + N
+         IYOLD  = IY     + N
+C
+         IDBLK  = 1
+         IBETA  = IDBLK  + N*(MMAX-1)
+         IHELP  = N + MMAX - 1
+         IF (IHELP .LT. IBETA) THEN
+           IBETA2 = INT(IBETA/IHELP)
+           IBETA  = MOD(IBETA,IHELP)
+           IF (IBETA .EQ. 0) THEN
+             IBETA = IHELP
+           ELSE
+             IBETA2 = IBETA2 + 1
+           ENDIF
+         ELSE
+           IBETA2 = 1
+         ENDIF
+         IBETAQ = 1
+         IDBLKQ = IBETAQ + MMAX*MMAX
+         IHELP  = 2*N+MMAX
+         IF (IHELP .LT. IDBLKQ) THEN
+           IDBKQ2 = INT(IDBLKQ/IHELP)
+           IDBLKQ  = MOD(IDBLKQ,IHELP)
+           IF (IDBLKQ .EQ. 0) THEN
+             IDBLKQ = IHELP
+           ELSE
+             IDBKQ2 = IDBKQ2 + 1
+           ENDIF
+         ELSE
+           IDBKQ2 = 1
+         ENDIF
+         IDB = IBETAQ + MMAX * (MMAX + N)
+         IF (IHELP .LT. IDB) THEN
+           IDB2 = INT(IDB/IHELP)
+           IDB  = MOD(IDB,IHELP)
+           IF (IDB .EQ. 0) THEN
+             IDB = IHELP
+           ELSE
+             IDB2 = IDB2 + 1
+           ENDIF
+         ELSE
+           IDB2 = 1
+         ENDIF
+C
+C
+C*****************************************************************
+C*       create the node file, if IFLAG > 0                      *
+C*****************************************************************
+C
+         IF (IFLAG .GT. 0) THEN
+            IC  = 1
+C
+            CALL IRKCOE (MMAX,LUNIN,WORK1(IC),WORK1(IAQ),
+     1                   WORK1(IALPHQ),WORK23(IBETAQ,1))
+         ENDIF
+         IF (EPSM .LE. 0.0D0) THEN
+C
+C*****************************************************************
+C*             determine the machine constant                    *
+C*****************************************************************
+C
+C           EPSM ist the smallest positive machine number with
+C           (1.0+EPSM) .GT. 1.0 . EPSM  is determined
+C           approximately as a power of 1./2. .
+C
+            FMACHP = 1.0D0
+   20       CONTINUE
+               FMACHP = 0.5D0 * FMACHP
+            IF (MACHPD(1.0D0+FMACHP) .EQ. 1) GOTO 20
+            EPSM = 2.0D0 * FMACHP
+         ENDIF
+C
+C*****************************************************************
+C*              solve the initialt value problem                 *
+C*****************************************************************
+C
+         CALL IMRUKU (DES,N,MMAX,LUNIN,LUNOUT,LUNPR,IERR,EPSM,
+     1                EPS,G,X0,XEND,Y0,YQ,
+     2                WORK1(IFAC),WORK1(IDELTK),WORK1(IHEPS),
+     3                WORK1(IALPH),WORK1(IALPHQ),WORK1(IA),
+     4                WORK1(IAQ),WORK1(IF0),WORK1(IF1),
+     5                WORK1(IDFDX),WORK1(IY),WORK1(IYOLD),
+     6                WORK21,WORK22(IDBLK,1),WORK22(IBETA,IBETA2),
+     7                WORK23(IBETAQ,1),WORK23(IDBLKQ,IDBKQ2),
+     8                WORK23(IDB,IDB2))
+      ENDIF
+C
+      RETURN
+      END
+</font>
+</pre>
+<a name="ende"</a>
+<hr>
+<a href="#anfang">Begin of file</a><br>
+<a href="../../inhalt.htm#fortra77kap17irkdrvfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+</body>
+</html>

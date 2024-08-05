@@ -1,0 +1,122 @@
+C[BA*)
+C[LE*)
+      SUBROUTINE SHPFLG(X,Y,FX,FY,F,W,R,EPS,N,DMUE,RR,PHI,IERR)
+C[IX{SHPFLG}*)
+C[LE*)
+C********************************************************************
+C[BE*)
+C                                                                   *
+C   Program name: SHPFLG                                            *
+C                                                                   *
+C********************************************************************
+C                                                                   *
+C[BA*)
+C   This subroutine computes one functional value at (X,Y) for given*
+C   nodes using the local Shepard method and Franke-Little weights. *
+C[BE*)
+C   The exponent dmue and the radius rr must be specified externally*
+C   DMUE should be chosen to lie betwen 2 and 6.                    *
+C   The radius RR should be so that the circle of radius RR around  *
+C   (X,Y) contains some nodes.                                      *
+C                                                                   *
+C********************************************************************
+C                                                                   *
+C   Input parameters:                                               *
+C   =================                                               *
+C   X    :  X value for which we want to interpolate the Z value    *
+C   Y    :  Y value for which we want to interpolate the Z value    *
+C   FX, FY, F   :  vectors ..(0:N) with X and Y coordinates of nodes*
+C                  (FX,FY) and corresponding functional value F.    *
+C   N    :  Index of last node                                      *
+C   DMUE :  Exponent, 0 < DMUE < infinity, reasonable results can   *
+C           be achieved for 2 < DMUE < 6. If on input DMUE <= 0, we *
+C           set DMUE = 2 internally.                                *
+C   RR   :  Radius around (X,Y) inside which all nodes are used to  *
+C           interpolate at (X,Y).                                   *
+C                                                                   *
+C                                                                   *
+C   AUX VECTORS:                                                    *
+C   ============                                                    *
+C   W, R, EPS   : vectors ..(0:N)                                   *
+C                                                                   *
+C                                                                   *
+C   Output parameters:                                              *
+C   ==================                                              *
+C   PHI  : Interpolated Z value at (X,Y)                            *
+C   IERR : Error parameter:                                         *
+C          = 0 : all correct                                        *
+C          = 1 : Sum of Franke-Little weights is zero               *
+C                                                                   *
+C                                                                   *
+C********************************************************************
+C                                                                   *
+C   Required subroutines: none                                      *
+C                                                                   *
+C********************************************************************
+C                                                                   *
+C   Author      : Bjoern Terwege                                    *
+C   Date        : 6.12.1995                                         *
+C   Source code : FORTRAN 77                                        *
+C                                                                   *
+C[BA*)
+C********************************************************************
+C[BE*)
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DIMENSION R(0:N),W(0:N),FX(0:N),FY(0:N),F(0:N),EPS(0:N)
+      IERR=0
+C
+C  Check that DMUE > 0, otherwise set DMUE = 2
+C
+      IF(DMUE.LE.0) DMUE=2
+C
+C  Check that  RR > 0, otherwise set RR = 0.1
+C
+      IF(RR.LE.0) RR=0.1
+C
+C  Compute the R(I)
+C
+      DO 20 I=0,N
+           R(I)=DSQRT(((X-FX(I))*(X-FX(I)))+
+     F          ((Y-FY(I))*(Y-FY(I))))
+           IF (R(I).EQ.0) THEN
+                PHI=F(I)
+                GOTO 111
+            ENDIF
+20    CONTINUE
+C
+C  Compute the EPS(I)
+C
+      DO 40 I=0,N
+          IF(R(I).GE.RR) THEN
+              EPS(I)=0
+          ELSE
+              EPS(I)=1-(R(I)/RR)
+          ENDIF
+40    CONTINUE
+C
+C  Compute the numerators needed for the weights
+C
+      SUM=0
+      DO 50 I=0,N
+          SUM=SUM+EPS(I)**DMUE
+50    CONTINUE
+      IF(SUM.EQ.0) THEN
+           IERR=1
+           GOTO 111
+      ENDIF
+C
+C  Compute the weights
+C
+      DO 60 J=0,N
+          W(J)=(EPS(J)**DMUE)/SUM
+60    CONTINUE
+C
+C  Compute the approximate function value at (X,Y)
+C
+      PHI=0
+      DO 70 I=0,N
+           PHI=PHI+W(I)*F(I)
+70    CONTINUE
+111   CONTINUE
+      RETURN
+      END

@@ -1,0 +1,3 @@
+00index.txt     all files in the current folder with short one line description
+html.dir        list of files in `html.zip'
+html.zip        translated HTML source codes of the EFNUM library, compressed via `zip'

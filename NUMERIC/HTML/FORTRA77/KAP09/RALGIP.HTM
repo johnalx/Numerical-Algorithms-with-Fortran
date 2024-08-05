@@ -1,0 +1,313 @@
+<html>
+<head>
+<title>fortra77/kap09/ralgip.for</title>
+</head>
+<body>
+<a name="anfang"</a>
+<hr>
+<a href="#ende">End of file</a><br>
+<a href="../../inhalt.htm#fortra77kap09ralgipfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+<font size=+2>
+<pre>
+
+
+
+</pre><u><h1>F 9.7  Rational Interpolation</h1></u><pre>
+
+<a name="RALGIP7"</a>      SUBROUTINE RALGIP(X,A,N,L,L1,IERR,NLEFT,Z)
+C
+C*****************************************************************
+C                                                                *
+C     Rational Lagrange interpolation. The interpolation         *
+C     function defined by the nodes X1, X2, X3, ...  and the     *
+C     functional values is the ratio of two polynomials. The     *
+C     degree of the nominator polynomial can be chosen by the    *
+C     user.                                                      *
+C                                                                *
+C                                                                *
+C     INPUT PARAMETERS:                                          *
+C     =================                                          *
+C     X      : (N+1)-vector X(0:N); the nodes X(I) for I=0,...,N *
+C     A      : (N+1)-vector A(0:N); the functional values at     *
+C              the nodes  X(I)                                   *
+C     N      : largest index used for the nodes                  *
+C     L      : degree of the denominator polynomial; L &lt; N       *
+C                                                                *
+C                                                                *
+C     OUTPUT PARAMETERS:                                         *
+C     ==================                                         *
+C     X      : as above, but possibly reordered                  *
+C     A      : (N+1)-vector A(0:N); the coefficients of the      *
+C              rational interpolation function                   *
+C     L1     : (N+1)-vector L1(0:N); contains information about  *
+C              the coefficients. This is needed for use in the   *
+C              FUNCTION RLIFCT.                                  *
+C     IERR   : = 0  everything o.k.                              *
+C              = 1  problem not solvable (check the nodes)       *
+C     NLEFT  : final index of the nodes for which we still have  *
+C              to interpolate                                    *
+C                                                                *
+C                                                                *
+C     AUXILIARY VARIABLES:                                       *
+C     ====================                                       *
+C     Z      : N-vector Z(0:N-1)                                 *
+C                                                                *
+C     The interpolating function has the continued fraction form:*
+C                                                                *
+C     F(X) =  A(N)  +                                            *
+C                                                                *
+C             + (X-X(N)) * A(N-1) +                              *
+C                                                                *
+C                          (X-X(N)) * (X-X(N-1))                 *
+C             + ------------------------------------------------ *
+C                                          (X-X(N-2))*(X-X(N-3)) *
+C               A(N-2) + (X-X(N-2))*A(N-3)+--------------------- *
+C                                          A(N-4)  +   . . .     *
+C                                                                *
+C     F(X) can be evaluated using the FUNCTION RLIFCT.           *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: RLIFCT, RLIORD                          *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author   : Helmut Werner                                      *
+C  editor   : Christiane Beer                                    *
+C  date     : 1983                                               *
+C  source   : FORTRAN 77                                         *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DIMENSION X(0:N),A(0:N),Z(0:N-1)
+      INTEGER L1(0:N)
+      IERR=0
+      EPS=1.0D-11
+C
+C     determine the degree of the denominator polynomial
+C
+      L2=L
+      M1=N-L
+      NLEFT=N
+      IF(M1 .LE. 0) THEN
+         IERR=1
+         RETURN
+      ENDIF
+C
+C     the degree of the numerator polynomial exceeds that of the denominator:
+C     a number of nodes equal to the difference between the denominator and
+C     the numerator degree is interpolated by forming divided differences
+C
+  100 DO 10  K=1,(L2-M1)
+         CALL RLIORD(X,A,NLEFT,XJ,AJ)
+         DO 20  I=0,NLEFT-1
+C
+C   stop if two nodes are identical
+C
+            IF((X(I)-XJ) .EQ. 0.0D0) THEN
+               IERR=1
+               RETURN
+            ENDIF
+            A(I)=(A(I)-AJ)/(X(I)-XJ)
+   20    CONTINUE
+         L1(NLEFT-1)=1
+         NLEFT=NLEFT-1
+   10 CONTINUE
+      IF(NLEFT .LT. 0) GOTO 200
+C
+C   the subsequent node is interpolated by forming
+C   inverse divided differences
+C
+      CALL RLIORD (X,A,NLEFT,XJ,AJ)
+      I1=0
+      DO 30  I=0,NLEFT-1
+         A2=A(I)-AJ
+         X2=X(I)-XJ
+C
+C   test for automatically interpolated nodes
+C
+         IF(DABS(A2) .LE. DABS(X2)*EPS) THEN
+            Z(I1)=X(I)
+            I1=I1+1
+         ELSE
+            A(I-I1)=X2/A2
+            X(I-I1)=X(I)
+         ENDIF
+   30 CONTINUE
+C
+C   automatically interpolated nodes are included in the
+C   divided differences
+C
+      DO 40  K=0,I1-1
+         X(NLEFT-1)=Z(K)
+         A(NLEFT-1)=0.0D0
+         DO 50  I=0,NLEFT-1
+            A(I)=A(I)*(X(I)-X(NLEFT))
+   50    CONTINUE
+         L1(NLEFT-1)=1
+         NLEFT=NLEFT-1
+   40 CONTINUE
+C
+C   determine the degrees of the factors of the interpolating
+C   rational function that still must be determined
+C
+      IF(NLEFT .GT. 0) THEN
+         NLEFT=NLEFT-1
+         L1(NLEFT)=-1
+         L2=M1
+         M1=NLEFT-L2
+      ENDIF
+  200 IF(M1 .LT. 0) THEN
+         IERR=1
+         RETURN
+      ENDIF
+C
+C   check whether interpolation is complete
+C
+      IF(NLEFT .GT. 0) GOTO 100
+C
+C   finish interpolation
+C   The following tests whether all nodes have been
+C   used in the interpolation
+C
+      FM=DABS(A(N))
+      DO 60  I=0,N-1
+         FM=FM+DABS(A(I))
+   60 CONTINUE
+      K=0
+      DO 70  I=0,N-1
+         IF(L1(I) .LT. 0) K=I+1
+         IF(K .NE. 0) THEN
+            F=RLIFCT(X(I+1),X,A,L1,I)
+            IF(DABS(F) .LE. FM*EPS) THEN
+               IERR=1
+               RETURN
+            ENDIF
+         ENDIF
+   70 CONTINUE
+      RETURN
+      END
+C
+C
+
+<a name="RLIFCT189"</a>      DOUBLE PRECISION FUNCTION RLIFCT(XW,X,A,L1,N)
+C
+C*****************************************************************
+C                                                                *
+C     Evaluate the rational interpolation function               *
+C     (see SUBROUTINE RALGIP)                                    *
+C                                                                *
+C                                                                *
+C     INPUT PARAMETERS:                                          *
+C     =================                                          *
+C     XW     : point where the rational interpolation function   *
+C              is to be evaluated                                *
+C     X      : (N+1)-vector X(0:N); the nodes, I=0,...,N         *
+C     A      : (N+1)-vector A(0:N); the coefficients of the      *
+C              rational interpolating function                   *
+C     L1     : (N+1)-vector L1(0:N); labels indicating whether   *
+C              we need to divide or mulptiply after evaluation   *
+C              of a Horner scheme                                *
+C     N      : final index of the nodes                          *
+C                                                                *
+C                                                                *
+C     OUTPUT PARAMETER:                                          *
+C     =================                                          *
+C     RLIFCT : functional value at XW                            *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author   : Helmut Werner                                      *
+C  editor   : Christiane Beer                                    *
+C  date     : 1983                                               *
+C  source   : FORTRAN 77                                         *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DIMENSION X(0:N),A(0:N)
+      INTEGER L1(0:N)
+      F=A(0)
+      DO 10  I=1,N
+         IF(L1(I-1) .GE. 0) THEN
+            F=A(I)+(XW-X(I))*F
+         ELSE
+            F=A(I)+(XW-X(I))/F
+         ENDIF
+   10 CONTINUE
+      RLIFCT=F
+      RETURN
+      END
+C
+C
+
+<a name="RLIORD249"</a>      SUBROUTINE RLIORD (X,A,N,XJ,AJ)
+C
+C*****************************************************************
+C                                                                *
+C     Determines the functional value of least magnitude         *
+C                                                                *
+C                                                                *
+C     INPUT PARAMETERS:                                          *
+C     =================                                          *
+C     X      : (N+1)-vector X(0:N); the nodes X(I), I=0,...,N    *
+C     A      : (N+1)-vector A(0:N); the functional values at X(I)*
+C     N      : final index of the nodes                          *
+C                                                                *
+C                                                                *
+C     OUTPUT PARAMETERS:                                         *
+C     ==================                                         *
+C     X      : as above, permutation of the node to be           *
+C              interpolated next with the last one used          *
+C     A      : see above, swap A(I) analogous to the X(I)        *
+C     XJ     : node with the functional value of smallest        *
+C              magnitude                                         *
+C     AJ     : largest absolute functional value                 *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author   : Helmut Werner                                      *
+C  editor   : Christiane Beer                                    *
+C  date     : 1983                                               *
+C  source   : FORTRAN 77                                         *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DIMENSION X(0:N), A(0:N)
+      AJ=A(N)
+      J1=N
+      DO 10 I=0,N-1
+         IF(DABS(AJ) .GT. DABS(A(I))) THEN
+            J1=I
+            AJ=A(I)
+         ENDIF
+   10 CONTINUE
+      XJ=X(J1)
+      X(J1)=X(N)
+      A(J1)=A(N)
+      X(N)=XJ
+      A(N)=AJ
+      RETURN
+      END
+</font>
+</pre>
+<a name="ende"</a>
+<hr>
+<a href="#anfang">Begin of file</a><br>
+<a href="../../inhalt.htm#fortra77kap09ralgipfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+</body>
+</html>

@@ -1,0 +1,193 @@
+C[BA*)
+C[LE*)
+C[LE*)
+C[LE*)
+C[FE{F 4.9}
+C[  {The Matrix Inverse via Exchange Steps}
+C[  {The Matrix Inverse via Exchange Steps}*)
+C[LE*)
+      SUBROUTINE PIVOT (A,LDA,N,B,S1,S2,IERR,MX,MY,VAL)
+C[IX{PIVOT}*)
+C
+C*****************************************************************
+C                                                                *
+C  This subroutine calculates the inverse of a real square NxN   *
+C  matrix  A  by applying exchange steps, also called the method *
+C  of pivotization.                                              *
+C[BE*)
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  A        : 2-dimensional array A(1:LDA,1:N) containing the    *
+C             matrix A that is to be inverted.                   *
+C  LDA      : leading dimension of A as defined in the calling   *
+C             program.                                           *
+C  N        : order of the matrix A.                             *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  ==================                                            *
+C  B        : 2-dimensional array B(1:LDA,1:N) containing the    *
+C             inverse matrix of A.                               *
+C  S1,S2    : control parameters;  S1 is the sum of the absolute *
+C             values of the diagonal entries of the matrix A*B-I,*
+C             where I is the nxn identity matrix.                *
+C             S2 is the sum of the absolute values of the off-   *
+C             diagonal entries in A*B-I. Theoretically A*B-I = 0.*
+C  IERR     : = 1, inverse of A has been found.                  *
+C             = 2, the matrix A is numerically singular, no      *
+C                  inverse exists.                               *
+C  VAL      : last pivot element, if A is numerically singular.  *
+C                                                                *
+C                                                                *
+C  AUXILIARY VECTORS:                                            *
+C  ==================                                            *
+C  MX,MY    : N-vectors of INTEGER type.                         *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: MACHPD                                  *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author     : Gisela Engeln-Muellges                           *
+C  date       : 05.18.1987                                       *
+C  source     : FORTRAN 77                                       *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+C  declarations.
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DOUBLE PRECISION A(LDA,N),B(LDA,N)
+      INTEGER MX(N),MY(N)
+C
+C  calculating the machine constant FMACHP.
+C
+      FMACHP=1.0D0
+    5 FMACHP=0.5D0*FMACHP
+      IF(MACHPD(1.0D0+FMACHP) .EQ. 1) GOTO 5
+      FMACHP=FMACHP*2.0D0
+C
+C  store matrix A in array B.
+C
+      DO 10 I=1,N
+         DO 20 J=1,N
+            B(I,J)=A(I,J)
+   20    CONTINUE
+   10 CONTINUE
+C
+C  initialize the pivot vectors MX and MY to zero.
+C
+      DO 30 I=1,N
+         MX(I)=0
+         MY(I)=0
+   30 CONTINUE
+C
+C  determine the pivot element.
+C
+      DO 40 I=1,N
+         PIVO=0.0D0
+         DO 50 IX=1,N
+            IF(MX(IX) .EQ. 0) THEN
+               DO 60 IY=1,N
+                  IF(MY(IY) .EQ. 0) THEN
+                     IF(DABS(B(IX,IY)) .GT. DABS(PIVO)) THEN
+                        PIVO=B(IX,IY)
+                        NX=IX
+                        NY=IY
+                     END IF
+                  END IF
+   60          CONTINUE
+            END IF
+   50    CONTINUE
+C
+C  if the pivot element is nearly zero, the matrix is numerically singular.
+C
+         IF(DABS(PIVO) .LT. 4.0D0*FMACHP) THEN
+            VAL=PIVO
+            IERR=2
+            RETURN
+         END IF
+C
+C  saving the indices of the pivot element.
+C
+         MX(NX)=NY
+         MY(NY)=NX
+C
+C  calculation of the matrix elements according to the
+C  rules for an exchange step.
+C
+         DUMMY=1.0D0/PIVO
+         DO 70 J=1,N
+            IF(J .NE. NX) THEN
+               FACTOR=B(J,NY)*DUMMY
+               DO 80 K=1,N
+                  B(J,K)=B(J,K)-B(NX,K)*FACTOR
+   80          CONTINUE
+               B(J,NY)=-FACTOR
+            END IF
+   70    CONTINUE
+         DO 90 K=1,N
+            B(NX,K)=B(NX,K)*DUMMY
+   90    CONTINUE
+         B(NX,NY)=DUMMY
+   40 CONTINUE
+C
+C  reverse row and column permutations.
+C
+      DO 100 I=1,N-1
+         DO 110 M=I,N
+            IF(MX(M) .EQ. I) GOTO 120
+  110    CONTINUE
+  120    J=M
+         IF(J .NE. I) THEN
+            DO 130 K=1,N
+               H=B(I,K)
+               B(I,K)=B(J,K)
+               B(J,K)=H
+  130       CONTINUE
+            MX(J)=MX(I)
+            MX(I)=I
+         END IF
+         DO 140 M=I,N
+            IF(MY(M) .EQ. I) GOTO 150
+  140    CONTINUE
+  150    J=M
+         IF(J .NE. I) THEN
+            DO 160 K=1,N
+               H=B(K,I)
+               B(K,I)=B(K,J)
+               B(K,J)=H
+  160       CONTINUE
+            MY(J)=MY(I)
+            MY(I)=I
+         END IF
+  100 CONTINUE
+C
+C  Forming the difference S= A*B-I, where I is the identity matrix.
+C  Forming the sum S1 of the absolute values of the diagonal elements of S
+C  and the sum S2 of remaining elements. Theoretically
+C  S1 and S2 should both equal zero.
+C
+      S1=0.0D0
+      S2=0.0D0
+      DO 170 I=1,N
+         DO 180 J=1,N
+            H=0.0D0
+            DO 190 K=1,N
+               H=H+A(I,K)*B(K,J)
+  190       CONTINUE
+            IF(I .EQ. J) THEN
+               S1=S1+DABS(H-1.0D0)
+            ELSE
+               S2=S2+DABS(H)
+            END IF
+  180    CONTINUE
+  170 CONTINUE
+      IERR=1
+      RETURN
+      END

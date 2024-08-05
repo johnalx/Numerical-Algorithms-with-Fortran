@@ -1,0 +1,324 @@
+C[BA*)
+C[LE*)
+C[LE*)
+C[LE*)
+C[FE{F 16.7}{Gau"s Cubature Formulas for Triangles}
+C[          {Gau"s Cubature Formulas for Triangles}*)
+C[LE*)
+      SUBROUTINE K3GAUN(USERF,PX,PY,QX,QY,RX,RY,N,METHOD,MOLD,
+C[IX{K3GAUN}*)
+     +                  CTRI,WORK,IERR,IUFCLL)
+C
+C*****************************************************************
+C                                                                *
+C Gaussian cubature over triangular regions:                     *
+C[BE*)
+C                                                                *
+C The FUNCTION USERF(X,Y) is integrated over the triangle PQR    *
+C according to the summed N point gaussian formula using N*N     *
+C sub-triangles.                                                 *
+C The dimensions of these sub-triangles are one Nth of those of  *
+C the original triangle PQR.                                     *
+C                                                                *
+C                                                                *
+C INPUT PARAMETERS:                                              *
+C =================                                              *
+C USERF   : user defined FUNCTION USERF(X,Y), whose integral is  *
+C           to be computed.                                      *
+C           The FUNCTION USERF must be declared as EXTERNAL in   *
+C           the calling program.                                 *
+C           The FUNCTION should have the following form:         *
+C                  DOUBLE PRECISION FUNCTION USERF(X,Y)          *
+C                  DOUBLE PRECISION X,Y                          *
+C                         .                                      *
+C                         .                                      *
+C                         .                                      *
+C                  USERF=F(X,Y)                                  *
+C                         .                                      *
+C                         .                                      *
+C                         .                                      *
+C                  RETURN                                        *
+C                  STOP                                          *
+C                                                                *
+C PX      : DOUBLE PRECISION X-coordinate of the vertex P        *
+C PY      : DOUBLE PRECISION Y-coordinate of the vertex P        *
+C QX      : DOUBLE PRECISION X-coordinate of the vertex Q        *
+C QY      : DOUBLE PRECISION Y-coordinate of the vertex Q        *
+C RX      : DOUBLE PRECISION X-coordinate of the vertex R        *
+C RY      : DOUBLE PRECISION Y-coordinate of the vertex R        *
+C N       : INTEGER, counting the number of sub-triangles formed *
+C           along one edge of the triangle.                      *
+C METHOD  : INTEGER, designating the method: If METHOD=1,2,3 or 7*
+C           the 1, 2, 3 or 7 point Gauss formula is chosen.      *
+C MOLD    : INTEGER, the number in METHOD at the previous call.  *
+C           Upon first call we must have: MOLD different from    *
+C           METHOD                                               *
+C           If K3GAUN is called repeatedly with METHOD=MOLD the  *
+C           internal initializing of parameters is skipped.      *
+C WORK    : 2-dimensional DOUBLE PRECISION array                 *
+C           WORK(3,0:METHOD-1). If METHOD=MOLD this array must   *
+C           contain the initializing parameters for the method.  *
+C                                                                *
+C                                                                *
+C OUTPUT PARAMETERS:                                             *
+C ==================                                             *
+C MOLD    : INTEGER indicating the number of points used in the  *
+C           Gauss method.                                        *
+C CTRI    : DOUBLE PRECISION approximate value for the integral  *
+C WORK    : 2-dimensional DOUBLE PRECISION array                 *
+C           WORK(3,0:METHOD-1) containing the constants needed   *
+C           for the specified method                             *
+C IERR    : error parameter: IERR=0 all is ok                    *
+C                            IERR=1 N is incorrect               *
+C                            IERR=2 the vertices P Q and R are   *
+C                                   collinear                    *
+C                            IERR=3 invalid Number for the method*
+C IUFCLL  : INTEGER, the number of function evaluations performed*
+C                                                                *
+C                                                                *
+C INTERMEDIATE VARIABLES:                                        *
+C =======================                                        *
+C I,J     : loop variables                                       *
+C II,JJ   : loop variables                                       *
+C DBLEN   : DOUBLE PRECISION version of N                        *
+C DBLEI   : DOUBLE PRECISION version of I                        *
+C DBLEJ   : DOUBLE PRECISION version of J                        *
+C AREA    : DOUBLE PRECISION to check collinearity               *
+C EPS     : DOUBLE PRECISION bound for collinearity check        *
+C HPQX    : DOUBLE PRECISION ]   vectoriel representation of     *
+C HPQY    : DOUBLE PRECISION ]   the steps taken along the edge  *
+C HPRX    : DOUBLE PRECISION ]   PQ or PR, respectively          *
+C HPRY    : DOUBLE PRECISION ]                                   *
+C FAC     : DOUBLE PRECISION number, indicates type of triangle  *
+C                              FAC=1.0  (not symmetric) or       *
+C                              FAC=-1.0 (reflection symmetric)   *
+C X       : DOUBLE PRECISION ]   coordinates of the top vertex   *
+C Y       : DOUBLE PRECISION ]   of the sub-triangle in use.     *
+C                                                                *
+C XX      : DOUBLE PRECISION ]   These are auxiliary variables   *
+C YY      : DOUBLE PRECISION ]   that determine the weights.     *
+C                                                                *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: K3GINI                                  *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author  : Volker KrÅger                                       *
+C  Date    : 06.12.1991                                          *
+C  Source  : FORTRAN 77                                          *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+C declarations
+C
+      DOUBLE PRECISION WORK(3,0:METHOD-1),
+     +                 PX,PY,QX,QY,RX,RY,CTRI,AREA,EPS,HPQX,HPQY,
+     +                 HPRX,HPRY,FAC,DBLEN,DBLEJ,DBLEI,X,XX,Y,YY,
+     +                 USERF
+C
+C initialize bound for collinearity check
+C
+      EPS=1.0D-06
+C
+C check N
+C
+      IF (N .LT. 1) THEN
+         IERR=1
+         RETURN
+      ENDIF
+C
+C   test for collinearity
+C
+      AREA=PX*QY+QX*RY+RX*PY-PX*RY-QX*PY-RX*QY
+      IF (AREA .LT. EPS) THEN
+         IERR=2
+         RETURN
+C
+C   check validity of method number
+C
+      ELSEIF (METHOD .LT. 0 .OR.  METHOD .GT. 7 .OR.
+     +        METHOD .GT. 3 .AND. METHOD .LT. 7) THEN
+         IERR=3
+         RETURN
+      ELSE
+         IERR=0
+      ENDIF
+C
+C Initialize if necessary
+C
+      IF (METHOD .NE. MOLD) THEN
+        CALL K3GINI(METHOD,WORK)
+        MOLD=METHOD
+      ENDIF
+C
+C Initialize IUFCLL
+C
+      IUFCLL=0
+C
+C find twice the area
+C
+      DBLEN=DBLE(N)
+      AREA=AREA/(DBLEN*DBLEN)
+C
+C vektorize the step size
+C
+      HPQX=(QX-PX)/DBLEN
+      HPQY=(QY-PY)/DBLEN
+      HPRX=(RX-PX)/DBLEN
+      HPRY=(RY-PY)/DBLEN
+
+C
+C Initialize CTRI
+C
+         CTRI=0.0D0
+C
+C Approximate the integral
+C
+         DO 10 JJ=0,1
+C
+C   triangle reflection symmetric or not
+C
+            IF (JJ .EQ. 0) THEN
+               FAC=1.0D0
+            ELSE
+               FAC=-1.0D0
+            ENDIF
+C
+C   loop along the edge PR
+C
+            DO 20 J=JJ,N-1
+               DBLEJ=DBLE(J)
+C
+C   loop along the edge PQ
+C
+               DO 30 I=JJ,N-1-J+JJ
+                  DBLEI=DBLE(I)
+C
+C   find the coordinates of the top vertex of the sub-triangle
+C
+                  X=PX+HPQX*DBLEI+HPRX*DBLEJ
+                  Y=PY+HPQY*DBLEI+HPRY*DBLEJ
+C
+C   sum the weighted functional values
+C
+                  DO 40 II=0,METHOD-1
+                     XX=HPQX*WORK(2,II)+HPRX*WORK(3,II)
+                     YY=HPQY*WORK(2,II)+HPRY*WORK(3,II)
+                     CTRI=CTRI+WORK(1,II)*USERF(X+FAC*XX,Y+FAC*YY)
+C
+C   count number of functional evaluations
+C
+                     IUFCLL=IUFCLL+1
+40                CONTINUE
+30             CONTINUE
+20          CONTINUE
+10       CONTINUE
+C
+C Multiply by the area
+C
+         CTRI=CTRI*AREA
+C
+C return to calling program
+C
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE K3GINI(METHOD,WORK)
+C[IX{K3GINI}*)
+C
+C*****************************************************************
+C                                                                *
+C SUBROUTINE that initializes the constants in accordance with   *
+C the method.                                                    *
+C[BE*)
+C                                                                *
+C                                                                *
+C INPUT PARAMETERS:                                              *
+C =================                                              *
+C METHOD  : INTEGER designating the method: METHOD= 1,2,3 or 7.  *
+C           This indicates the number of points used.            *
+C                                                                *
+C                                                                *
+C OUTPUT PARAMETERS:                                             *
+C ==================                                             *
+C WORK    : 2-dimensional DOUBLE PRECISION array                 *
+C           WORK(3,0:METHOD-1) containing the constants for the  *
+C           method used.                                         *
+C                                                                *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author   : Volker KrÅger                                      *
+C  Date     : 06.12.1991                                         *
+C  Source   : FORTRAN 77                                         *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+C Declarations
+C
+      DOUBLE PRECISION WORK(3,0:METHOD-1)
+C
+C  Initialize the array WORK depending on specified method
+C
+      IF (METHOD .EQ. 1) THEN
+         WORK(1,0)= 0.5D0
+         WORK(2,0)= 0.3333333333333333D0
+         WORK(3,0)= 0.3333333333333333D0
+      ELSEIF (METHOD .EQ. 2) THEN
+         WORK(1,0)= 0.25D0
+         WORK(2,0)= 0.1666666666666667D0
+         WORK(3,0)= 0.5D0
+         WORK(1,1)= 0.25D0
+         WORK(2,1)= 0.5D0
+         WORK(3,1)= 0.1666666666666667D0
+      ELSEIF (METHOD .EQ. 3) THEN
+         WORK(1,0)= 0.16666666666666667D0
+         WORK(2,0)= 0.1666666666666667D0
+         WORK(3,0)= 0.1666666666666667D0
+         WORK(1,1)= 0.16666666666666667D0
+         WORK(2,1)= 0.6666666666666667D0
+         WORK(3,1)= 0.1666666666666667D0
+         WORK(1,2)= 0.16666666666666667D0
+         WORK(2,2)= 0.1666666666666667D0
+         WORK(3,2)= 0.6666666666666667D0
+      ELSEIF (METHOD .EQ. 7) THEN
+         WORK(1,0)= 0.1125D0
+         WORK(2,0)= 0.3333333333333333D0
+         WORK(3,0)= 0.3333333333333333D0
+         WORK(1,1)= 0.0661970763942531D0
+         WORK(2,1)= 0.4701420641051151D0
+         WORK(3,1)= 0.4701420641051151D0
+         WORK(1,2)= 0.0661970763942531D0
+         WORK(2,2)= 0.05971587178976981D0
+         WORK(3,2)= 0.4701420641051151D0
+         WORK(1,3)= 0.0661970763942531D0
+         WORK(2,3)= 0.4701420641051151D0
+         WORK(3,3)= 0.05971587178976981D0
+         WORK(1,4)= 0.06296959027241357D0
+         WORK(2,4)= 0.1012865073234563D0
+         WORK(3,4)= 0.1012865073234563D0
+         WORK(1,5)= 0.06296959027241357D0
+         WORK(2,5)= 0.7974269853530873D0
+         WORK(3,5)= 0.1012865073234563D0
+         WORK(1,6)= 0.06296959027241357D0
+         WORK(2,6)= 0.1012865073234563D0
+         WORK(3,6)= 0.7974269853530873D0
+      ENDIF
+C
+C Return to calling program
+C
+      RETURN
+      END

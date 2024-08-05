@@ -1,0 +1,94 @@
+<html>
+<head>
+<title>fortra77/kap04/hacond.for</title>
+</head>
+<body>
+<a name="anfang"</a>
+<hr>
+<a href="#ende">End of file</a><br>
+<a href="../../inhalt.htm#fortra77kap04hacondfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+<font size=+2>
+<pre>
+
+
+
+</pre><u><h1>F 4.15.1  Error and the             Condition Number</h1></u><pre>
+
+<a name="HACOND8"</a>      SUBROUTINE HACOND(N,A0,A,LDA,MARK,HCOND)
+C
+C*****************************************************************
+C                                                                *
+C  SUBROUTINE HACOND calculates the Hadamard condition number    *
+C  of the matrix A0 with A0 = A(ORG).  The determinant of A0 is  *
+C  calculated via the product of the diagonal elements of the    *
+C  upper triangular factor R from SUBROUTINE GAUSSP, where       *
+C    P * A(ORG) = L * R, for  P a permutation matrix.            *
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  N        : order of the square matrices A and A0.             *
+C  A0       : 2-dimensional array A0(1:LDA,1:N); the matrix      *
+C             A(ORG).                                            *
+C  A        : 2-dimensional array A(1:LDA,1:N)  containing the   *
+C             factors  L  and  R  with  P * A(ORG) = L * R.      *
+C             P = permutation array; A is overwritten by L and R.*
+C             It is the output array of SUBROUTINE GAUSSP.       *
+C  LDA      : leading dimension of A and A0 as defined in the    *
+C             calling program.                                   *
+C  MARK     : = 1, even number of row permutations.              *
+C             =-1, odd number of row permutations.               *
+C             = 0, matrix A is singular. A is the output of      *
+C             SUBROUTINE GAUSSP. The determinant is given as :   *
+C                DET(A(ORG)) = MARK * A(1,1) * ... * A(N,N).     *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  ==================                                            *
+C  HCOND    : Hadamard condition number of A0.                   *
+C             empirical advice: If                               *
+C             HCOND &lt; 0.01         : badly conditioned matrix A0 *
+C                                    (The smaller HCOND, the     *
+C                                    worse A0 is conditiond).    *
+C             0.01 &lt;= HCOND &lt;= 0.1 : no precise conclusion.      *
+C             HCOND > 0.1          : well conditioned matrix A0. *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  authors   : Gisela Engeln-Muellges, Guido Dubois              *
+C  date      : 04.25.88                                          *
+C  source    : FORTRAN 77                                        *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DOUBLE PRECISION A0(1:LDA,1:N),A(1:LDA,1:N)
+      HCOND=0.0D0
+      IF(MARK .EQ. 0) RETURN
+      HCOND=1.0D0
+      DO 10 I=1,N
+         ZSNORM=0.0D0
+         DO 20 K=1,N
+            ZSNORM=ZSNORM+A0(I,K)*A0(I,K)
+   20    CONTINUE
+         HCOND=HCOND*A(I,I)/DSQRT(ZSNORM)
+   10 CONTINUE
+      HCOND=DABS(HCOND)
+      RETURN
+      END
+</font>
+</pre>
+<a name="ende"</a>
+<hr>
+<a href="#anfang">Begin of file</a><br>
+<a href="../../inhalt.htm#fortra77kap04hacondfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+</body>
+</html>

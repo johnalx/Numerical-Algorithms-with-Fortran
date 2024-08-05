@@ -1,0 +1,177 @@
+
+
+./00index.txt:
+
+00index.txt     all files in the current folder with short one line description
+readme.txt      detailed description of current folder
+start.htm       start of the HTML tour of the source codes of the Numerical Library
+numeric/        folder with all source codes of the Library in varying representations
+tools/          folder with various programs to handle the Numerical Library
+all0.dir        list of all files on the CD (with relative paths only)
+all1.dir        like `all0.dir', but augmented by file attributes like dates and sizes of files
+allindex.txt    summary of all files `00index.txt' on the CD
+
+
+./numeric/00index.txt:
+
+00index.txt     all files in the current folder with short one line description
+readme.txt      detailed description of current folder
+source/         folder with the uncompressed EFNUM source codes in FORTRAN 77 and quasi-Fortran 90
+html/           folder with the HTML versions of the EFNUM source codes in FORTRAN 77
+zip/            folder with the compressed EFNUM source codes in FORTRAN 77 and quasi-Fortran 90
+output/         EFNUM test results in compressed form
+
+
+./numeric/source/00index.txt:
+
+00index.txt     all files in the current folder with short one line description
+readme.txt      detailed description of current folder
+fortra77/       folder with EFNUM source codes in FORTRAN 77
+quasif90/       folder with EFNUM source codes in quasi-Fortran 90
+
+
+./numeric/zip/00index.txt:
+
+00index.txt     all files in the current folder with short one line description
+readme.txt      detailed description of current folder
+fortra77/       folder with the EFNUM source codes in FORTRAN 77 in compressed ZIP format
+quasif90/       folder with the EFNUM source codes in quasi-Fortran 90 in compressed ZIP format
+html/           folder with the EFNUM source codes in FORTRAN 77 translated into HTML, in compressed ZIP format
+
+
+./numeric/zip/fortra77/00index.txt:
+
+00index.txt     all files in the current folder with short one line description
+efnum804.dir    list of files in `efnum804.zip'
+efnum804.zip    compressed source codes of EFNUM in FORTRAN 77
+
+
+./numeric/zip/quasif90/00index.txt:
+
+00index.txt     all files in the current folder with short one line description
+eqfnu804.dir    list of files in `eqfnu804.zip'
+eqfnu804.zip    compressed source codes of EFNUM in quasi-Fortran 90
+
+
+./numeric/zip/html/00index.txt:
+
+00index.txt     all files in the current folder with short one line description
+html.dir        list of files in `html.zip'
+html.zip        translated HTML source codes of the EFNUM library, compressed via `zip'
+
+
+./numeric/output/00index.txt:
+
+00index.txt     all files in the current folder with short one line description
+readme.txt      detailed description of current folder
+fortra77/       EFNUM test results
+
+
+./numeric/output/fortra77/gnuos2/00index.txt:
+
+00index.txt     all files in the current folder with short one line description
+gnuout.zip      test results with GNU FORTRAN 0.5.18 under OS/2
+
+
+./tools/00index.txt:
+
+00index.txt     all files in the current folder with short one line description
+readme.txt      detailed description of current folder
+compiler/       GNU FORTRAN 77 compiler for OS/2, based on emx 0.9b with GNU-C/C++
+make/           a universal program maintenance program, called DMAKE, including its source codes
+packer/         the compression/decompression program `zip/unzip' for various operating systems, including its source code
+
+
+./tools/compiler/00index.txt:
+
+00index.txt     all files in the current folder with short one line description
+readme.txt      detailed description of current folder
+fortra77/       GNU FORTRAN 0.5.18 for OS/2, based on emx 0.9b and GNU C/C++ 2.7.2
+
+
+./tools/compiler/fortra77/gnu/os2/00index.txt:
+
+00index.txt     all files in the current folder with short one line description
+readme.doc      introduction to emx 0.9b, list of packages, short installation guide, etc
+install.doc     installation guide for emx 0.9b
+history.doc     change log of emx 0.9b
+emxrt.zip       emx runtime package
+emxdev.zip      files required for developing programs with emx
+emxview.zip     emx documentation in OS/2 .inf format
+gnudev1.zip     the GNU C compiler, the GNU debugger, and other tools
+gnudev2.zip     part two of the GNU C compiler, the GNU debugger and other tools
+gppdev.zip      additional files for GCC required for compiling C++ programs
+gnuview.zip     enxgnu.inf (emxgnu.doc in OS/2 .inf format)
+emxfix05.doc    introduction to fix package 5
+emxfix05.zip    a fix package for emx 0.9b, containing all fixes and new features of emxfix01.zip through emxfix04.zip, and new fixes
+g77emx.doc      introduction to GNU FORTRAN (g77-0.5.18) for emx
+g77bin.zip      GNU FORTRAN (g77-0.5.18) for emx
+
+
+./tools/make/00index.txt:
+
+00index.txt     all files in the current folder with short one line description
+readme.txt      detailed description of current folder
+dmake/          DMAKE 3.80 and 4.00 in source code and with executable files for OS/2
+
+
+./tools/make/dmake/exe/os2/380/00index.txt:
+
+00index.txt     all files in the current folder with short one line description
+dmake.ttp       executable file of DMAKE 3.80 for OS/2 (32 bit)
+startup.mk      startup file of DMAKE 3.80 for OS/2 and Microsoft C
+
+
+./tools/make/dmake/exe/os2/400/00index.txt:
+
+00index.txt     all files in the current folder with short one line descriptions
+dmake.ttp       executable file of DMAKE 4.00 for OS/2 (32 bit)
+startup.mk      startup file of DMAKE 4.00 for OS/2 and Borland C++
+dmake40.zip     compressed source codes and executable file of DMAKE 4.00 for OS/2
+
+
+./tools/make/dmake/source/00index.txt:
+
+00index.txt     all files in the current folder with short one line description
+dmake38s.zip    all compressed source codes of DMAKE 3.80
+dmake40.zip     all compressed source codes of DMAKE 4.00
+
+
+./tools/packer/zip/00index.txt:
+
+00index.txt     all files in the current folder with short one line description
+readme.txt      detailed description of the current folder
+exe/            ZIP/UNZIP as executable files for DOS, OS/2 and TOS
+source/         UNZIP 5.12 and ZIP 2.0.1 in source code
+
+
+./tools/packer/zip/exe/dos/00index.txt:
+
+00index.txt     all files in the current folder with short one line description
+unzip.exe       executable file of UNZIP 5.12 for MS-DOS
+zip.exe         executable file of ZIP 2.0.1 for MS-DOS
+
+
+./tools/packer/zip/exe/os2/00index.txt:
+
+00index.txt     all files in the current folder with short one line description
+unzip.ttp       executable file of UNZIP 5.12 for OS/2 (32 bit)
+unzip.doc       documentation for UNZIP 5.12
+zip.ttp         executable file of ZIP 2.0.1 for OS/2 (32 bit)
+
+
+./tools/packer/zip/exe/tos/00index.txt:
+
+00index.txt     all files in the current folder with short one line description
+unzip.ttp       executable file of UNZIP 5.12 for TOS 4.04
+unzip.doc       documentation of UNZIP 5.12
+zip.ttp         executable file of ZIP 2.0.1 for TOS 4.04
+zip.doc         documentation of ZIP 2.0.1
+
+
+./tools/packer/zip/source/00index.txt:
+
+00index.txt     all files in the current folder with short one line description
+unzip512.tgz    all source codes of UNZIP 5.12, packed with `tar' and `gzip'
+unzip512.zip    all compressed source codes of UNZIP 5.12
+zip201.zip      all compressed source codes of ZIP 2.01

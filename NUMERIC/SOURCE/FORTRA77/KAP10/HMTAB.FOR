@@ -1,0 +1,197 @@
+C[BA*)
+C[LE*)
+      SUBROUTINE HMTAB(N,NTAB,XBEG,XEND,DELTX,X,A,B,C,D,E,F,
+C[IX{HMTAB}*)
+     &                 XTAB,YTAB,LENTAB,IERR)
+C
+C*****************************************************************
+C                                                                *
+C  Constructs a value table for a hermitian polynomial spline of *
+C  degree five over an arbitrary interval inside the interval of *
+C  definition (X(1),X(N)).                                       *
+C[BE*)
+C  The nodes for the spline inside the                           *
+C  subinterval are also tabulated.                               *
+C  This allows the program to be used to create input data for   *
+C  graphics subroutines.                                         *
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  N        : Number of nodes for the spline                     *
+C  NTAB     : Maximal length of the table. NTAB should be at     *
+C             least  (XEND-XBEG)/DELTX+N                         *
+C  XBEG     : ) Interval, where the spline is to be tabulated    *
+C  XEND     : ) with the necessary inclusion condition:          *
+C                   X(1) <= XBEG <= XEND <= X(N)                 *
+C  DELTX    : Step size. The values are created for x-ordinates  *
+C             X = XBEG, XBEG + DELTX, ..., XEND                  *
+C  X        : N-vector X(1:N); the nodes for the spline          *
+C  A, B, C  : ) N-vectors ..(1:N); the spline coefficients       *
+C  D, E, F  : )                                                  *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  =================                                             *
+C  XTAB     : ) NTAB-vectors ..(1:NTAB); the value table         *
+C  YTAB     : ) Specifically, YTAB(I) = S(XTAB(I)) for           *
+C             )          I = 1, ..., LENTAB                      *
+C  LENTAB   : size of the table                                  *
+C  IERR     : = 0, no error                                      *
+C             = 1, XBEG > XEND .OR. XBEG < X(1) .OR. XEND > X(N) *
+C             = 2, DELTX <= 0.                                   *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  Required subroutines: MACHPD                                  *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author      : Guido Dubois                                    *
+C  Date        : 1.30.1993                                       *
+C  Source code : FORTRAN 77                                      *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+      INTEGER N,NTAB,LENTAB,IERR,I,J,K,M,IBEG,IEND,LBEG,IFLAG,
+     &        MACHPD,IBP1,IEM1
+      DOUBLE PRECISION X(1:N),A(1:N),B(1:N),C(1:N),D(1:N),E(1:N),
+     &                 F(1:N),XTAB(1:NTAB),YTAB(1:NTAB),XBEG,XEND,
+     &                 DELTX,X0,X1,FMACHP,EPS
+C
+C  Local storage of the error EPS in case this subroutine is
+C  called repeatedly.
+C
+      SAVE EPS,IFLAG
+      DATA IFLAG /0/
+      IERR=0
+C
+C  Check input parameters
+C
+      IF(XBEG .GT. XEND .OR. XBEG .LT. X(1)
+     &                  .OR. XEND .GT. X(N)) THEN
+         IERR=1
+         RETURN
+      END IF
+      IF(DELTX .LE. 0.0D0) THEN
+         IERR=2
+         RETURN
+      END IF
+C
+C  Find the machine constant
+C
+      IF(IFLAG .EQ. 0) THEN
+         IFLAG=1
+         FMACHP=1.0D0
+    5    FMACHP=0.5D0*FMACHP
+         IF(MACHPD(1.0D0+FMACHP) .EQ. 1) GOTO 5
+         FMACHP=2.0D0*FMACHP
+         EPS=1000.0D0*FMACHP
+      ENDIF
+C
+C  Determine the initial and terminal intervals for the computations
+C
+      LENTAB=0
+      I=1
+      K=N
+   10 M=(I+K)/2
+      IF(M .NE. I) THEN
+         IF(XBEG .GE. X(M)) THEN
+            I=M
+         ELSE
+            K=M
+         END IF
+         GOTO 10
+      END IF
+      IBEG=I
+      K=N
+   20 M=(I+K)/2
+      IF(M .NE. I) THEN
+         IF(XEND .GT. X(M)) THEN
+            I=M
+         ELSE
+            K=M
+         END IF
+         GOTO 20
+      END IF
+      IEND=I
+C
+      X0=XBEG
+      X1=X0-X(IBEG)
+      IF(IBEG .NE. IEND) THEN
+C
+C  First interval
+C
+         LENTAB=INT((X(IBEG+1)-XBEG+EPS)/DELTX)+1
+         DO 30 J=1,LENTAB
+            XTAB(J)=X0
+            YTAB(J)=((((F(IBEG)*X1+E(IBEG))*X1+D(IBEG))*X1+
+     &                             C(IBEG))*X1+B(IBEG))*X1+A(IBEG)
+            X0=X0+DELTX
+            X1=X1+DELTX
+   30    CONTINUE
+C
+C  Second to (N-1)st interval
+C
+         IF((IEND-IBEG) .NE. 1) THEN
+            IBP1=IBEG+1
+            IEM1=IEND-1
+            DO 40 I=IBP1,IEM1
+               IF(DABS(X0-DELTX-X(I)) .GT. EPS) THEN
+                  LENTAB=LENTAB+1
+                  XTAB(LENTAB)=X(I)
+                  YTAB(LENTAB)=A(I)
+               END IF
+               LBEG=LENTAB+1
+               LENTAB=LENTAB+INT((X(I+1)-X0+EPS)/DELTX)+1
+               X1=X0-X(I)
+               DO 50 J=LBEG,LENTAB
+                  XTAB(J)=X0
+                  YTAB(J)=((((F(I)*X1+E(I))*X1+D(I))*X1+
+     &                                C(I))*X1+B(I))*X1+A(I)
+                  X0=X0+DELTX
+                  X1=X1+DELTX
+   50          CONTINUE
+   40       CONTINUE
+         END IF
+      ELSE
+         LENTAB=LENTAB+1
+         XTAB(LENTAB)=X0
+         YTAB(LENTAB)=((((F(IBEG)*X1+E(IBEG))*X1+D(IBEG))*X1+
+     &                               C(IBEG))*X1+B(IBEG))*X1+A(IBEG)
+         X0=X0+DELTX
+         X1=X1+DELTX
+      END IF
+C
+C  Nth interval
+C
+      IF(DABS(X0-DELTX-X(IEND)) .GT. EPS .AND.
+     &                  X(IEND) .GT. XBEG) THEN
+         LENTAB=LENTAB+1
+         XTAB(LENTAB)=X(IEND)
+         YTAB(LENTAB)=A(IEND)
+      END IF
+      LBEG=LENTAB+1
+      LENTAB=LENTAB+INT((XEND-X0+EPS)/DELTX)+1
+      X1=X0-X(IEND)
+      IF(LENTAB .GE. LBEG) THEN
+         DO 60 J=LBEG,LENTAB
+            XTAB(J)=X0
+            YTAB(J)=((((F(IEND)*X1+E(IEND))*X1+D(IEND))*X1+
+     &                             C(IEND))*X1+B(IEND))*X1+A(IEND)
+            X0=X0+DELTX
+            X1=X1+DELTX
+   60    CONTINUE
+      END IF
+      IF(DABS(X0-DELTX-XEND) .GT. EPS) THEN
+         LENTAB=LENTAB+1
+         X0=XEND
+         X1=X0-X(IEND)
+         XTAB(LENTAB)=X0
+         YTAB(LENTAB)=((((F(IEND)*X1+E(IEND))*X1+D(IEND))*X1+
+     &                               C(IEND))*X1+B(IEND))*X1+A(IEND)
+      END IF
+      RETURN
+      END

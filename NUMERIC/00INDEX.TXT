@@ -1,0 +1,6 @@
+00index.txt     all files in the current folder with short one line description
+readme.txt      detailed description of current folder
+source/         folder with the uncompressed EFNUM source codes in FORTRAN 77 and quasi-Fortran 90
+html/           folder with the HTML versions of the EFNUM source codes in FORTRAN 77
+zip/            folder with the compressed EFNUM source codes in FORTRAN 77 and quasi-Fortran 90
+output/         EFNUM test results in compressed form

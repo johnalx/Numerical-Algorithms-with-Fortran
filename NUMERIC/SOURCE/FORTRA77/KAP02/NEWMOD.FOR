@@ -1,0 +1,204 @@
+C[BA*)
+C[LE*)
+C[LE*)
+C[LE*)
+C[FE{F 2.5.3}
+C[  {Newton's Method for Multiple Zeros}
+C[  {Newton's Method for Multiple Zeros;
+C[   a Modified Newton's Method}*)
+C[LE*)
+      SUBROUTINE NEWMOD(FCT,FDER,F2DER,X0,MAXIT,LUN,ABSERR,
+C[IX{NEWMOD}*)
+     +                  RELERR,X,F,J,NUMIT,IERR)
+C
+C*****************************************************************
+C                                                                *
+C  This SUBROUTINE determines an approximation X for a J-fold    *
+C  zero of the function FCT by applying the modified Newton      *
+C  method for the starting value X0.                             *
+C[BE*)
+C  The iteration function is :                                   *
+C             PHI:=X-J(X)*FCT(X)/FDER(X), where                  *
+C          J(X)=1./(1.-FCT(X)*F2DER(X)/FDER(X)**2).              *
+C  The values J(X) converge towards the order J of the zero X.   *
+C  The method converges quadratically. However, its efficiency   *
+C  is only E=1.26, since each iteration step requires three      *
+C  functional evaluations.                                       *
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  FCT      : function whose zero is to be determined.           *
+C             It has the form                                    *
+C                 DOUBLE PRECISION FUNCTION FCT(X)               *
+C             and must be declared as EXTERNAL by the            *
+C             calling program (or as INTRINSIC if a FORTRAN      *
+C             standard function is used).                        *
+C  FDER     : 1st derivative of the function FCT. It has the     *
+C             form                                               *
+C                 DOUBLE PRECISION FUNCTION FDER(X)              *
+C             and has to be declared as EXTERNAL by the          *
+C             calling program (or as INTRINSIC if a FORTRAN      *
+C             standard function is used).                        *
+C  F2DER    : 2nd derivative of the function FCT. It has the     *
+C             form                                               *
+C                 DOUBLE PRECISION FUNCTION F2DER(X)             *
+C             and has to be declared as EXTERNAL in the          *
+C             calling program (or as INTRINSIC if a FORTRAN      *
+C             standard function is used).                        *
+C  X0       : starting value for the iteration.                  *
+C  MAXIT    : maximum number of iteration steps (MAXIT >= 1).    *
+C  LUN      : > 0, tape unit onto which the iteration values X   *
+C             and their corresponding orders J(X) are stored.    *
+C  ABSERR   : ) error bounds that both must be >= 0.0, while     *
+C  RELERR   : ) their sum has to be > 0.0. The following mixed   *
+C               test will be used inside the subroutine:         *
+C                  ABS(X1-X2) <= ABS(X2)*RELERR+ABSERR.          *
+C               Thus if RELERR was chosen as 0.0, this tests for *
+C               the absolute error; if ABSERR=0.0 is chosen this *
+C               tests for the relative error.                    *
+C               The values chosen for ABSERR and RELERR are      *
+C               used unaltered by the program if they both       *
+C               exceed the machine constant by a factor of five, *
+C               unless one of their values is zero, in which     *
+C               case the other must exceed the machine constant  *
+C               by a factor of five.                             *
+C               If this is not the case, then both, or one of    *
+C               the error bounds are set to five times the       *
+C               machine constant internally.                     *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  ==================                                            *
+C  ABSERR   : ) error parameters actually used.                  *
+C  RELERR   : )                                                  *
+C  X        : last approximate value for the zero of FCT.        *
+C  F        : function value of FCT at the last                  *
+C             approximate value X.                               *
+C  J        : order of the zero X.                               *
+C             (see remark below)                                 *
+C  NUMIT    : number of iteration steps performed.               *
+C  IERR     : = 0, input parameter are faulty                    *
+C             = 1, zero found; break-off criterion for the       *
+C                  difference of the last two approxiations      *
+C                  has been met.                                 *
+C             = 2, zero X found.                                 *
+C                  ABS(FCT(X)) < 5 * machine constant.           *
+C             = 3, starting value X0 already is a zero           *
+C                  of FCT(X0)=0.0 (machine zero).                *
+C             = 4, zero not found. The maximum number of         *
+C                  iterations reached without meeting the        *
+C                  break-off criterion.                          *
+C                  The error bounds might have been chosen too   *
+C                  small or the starting value X0 is not close   *
+C                  enough to a zero of FCT.                      *
+C                                                                *
+C                                                                *
+C                                                                *
+C  NOTE  : The quotients FCT/FDER and FCT*F2DER/FDER**2 become   *
+C          indeterminant in a neighborhood of the (multiple)     *
+C          zero. Thus, even for small error bounds the zero can  *
+C          only be determined with limited precision.            *
+C          In some rare test cases the value for the order J of  *
+C          the zero was computed incorrectly due to the inde-    *
+C          terminate expression for J(X). Therefore the results  *
+C          should always be inspected on TAPE unit # LUN and     *
+C          interpreted according to [ENGE87], p.51.              *
+C                                                                *
+c----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: MACHPD                                  *
+C                                                                *
+c*****************************************************************
+C                                                                *
+C  author     : Gisela Engeln-Muellges                           *
+C  date       : 09.23.1985                                       *
+C  source     : FORTRAN 77                                       *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+C
+C  initializing the iteration step counter NUMIT.
+C
+      NUMIT=0
+C
+C  test for validity of the input parameters ABSERR, RELERR and MAXIT.
+C
+      IF(ABSERR .LT. 0.0D0 .OR. RELERR .LT. 0.0D0 .OR. ABSERR+RELERR
+     +   .LE. 0.0D0 .OR. MAXIT .LT. 1) THEN
+         IERR=0
+         RETURN
+      END IF
+C
+C  test whether X0 already is already a zero of FCT: FCT(X0)=0.0
+C  (machine zero).
+C
+      X=X0
+      F=FCT(X)
+      IF(F .EQ. 0.0D0) THEN
+         IERR=3
+         RETURN
+      END IF
+C
+C  compute the machine constant and, if necessary,
+C  adjust the error bounds.
+C
+      FMACHP=1.0D0
+   10 FMACHP=0.5D0*FMACHP
+      IF(MACHPD(1.0D0+FMACHP) .EQ. 1) GOTO 10
+      FMACHP=2.0D0*FMACHP
+      DUMMY=5.0D0*FMACHP
+      IF(RELERR .EQ. 0.0D0) THEN
+         IF(ABSERR .LT. DUMMY) ABSERR=DUMMY
+      ELSE IF(ABSERR .EQ. 0.0D0) THEN
+         IF(RELERR .LT. DUMMY) RELERR=DUMMY
+      ELSE
+         IF(ABSERR .LT. DUMMY) ABSERR=DUMMY
+         IF(RELERR .LT. DUMMY) RELERR=DUMMY
+      END IF
+C
+C  iteration loop.
+C
+      WRITE(LUN,900)
+   20 IF(DABS(F) .LT. DUMMY) THEN
+         IERR=2
+         WRITE(LUN,910)NUMIT,X
+         WRITE(LUN,*)
+         RETURN
+      ELSE
+         FD=FDER(X)
+         F2D=F2DER(X)
+         IF(DABS(FD) .LT. DUMMY) THEN
+            FD=DSIGN(1.0D-6,FD)
+         END IF
+         XJ=1.0D0/(1.0D0-F*F2D/(FD*FD))
+         WRITE(LUN,910)NUMIT,X,XJ
+         DIFF=XJ*F/FD
+         X=X-DIFF
+         NUMIT=NUMIT+1
+         F=FCT(X)
+         J=INT(XJ+0.5D0)
+C
+C  test whether the break-off criterion is met.
+C
+         IF(DABS(DIFF) .LT. DABS(X)*RELERR+ABSERR) THEN
+            IERR=1
+            WRITE(LUN,910)NUMIT,X
+            WRITE(LUN,*)
+            RETURN
+         ELSE IF(NUMIT .GE. MAXIT) THEN
+            IERR=4
+            WRITE(LUN,910)NUMIT,X
+            WRITE(LUN,*)
+            RETURN
+         END IF
+      END IF
+      GOTO 20
+  900 FORMAT(1X,'Results of the iteration:',/,1X,25('*'),//,3X,
+     +       'I',1X,'I',9X,'X(I)',9X,'I',7X,'J(X(I))',/,1X,
+     +       49('='),/,5X,'I',22X,'I')
+  910 FORMAT(1X,I3,2(' I ',D20.14))
+      END

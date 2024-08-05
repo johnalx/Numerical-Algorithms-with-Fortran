@@ -1,0 +1,168 @@
+<html>
+<head>
+<title>fortra77/kap15/quarom.for</title>
+</head>
+<body>
+<a name="anfang"</a>
+<hr>
+<a href="#ende">End of file</a><br>
+<a href="../../inhalt.htm#fortra77kap15quaromfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+<font size=+2>
+<pre>
+
+
+
+</pre><u><h1>F 15.10  Romberg Integration</h1></u><pre>
+
+<a name="QUAROM7"</a>      SUBROUTINE  QUAROM  (A, B, EPS, N, H, FCT, EL,
+     !                     RESULT, ERREST, IERR)
+C
+C*****************************************************************
+C                                                                *
+C     This subroutine determines an approximation for the        *
+C     integral of the FUNCTION FCT(X) over the interval [A,B]    *
+C     using the ROMBERG-method.                                  *
+C                                                                *
+C                                                                *
+C     INPUT PARAMETERS:                                          *
+C     =================                                          *
+C     A,B    - the interval endpoints.                           *
+C     EPS    - accuracy bound for the error estimate.            *
+C     N      - maximum number of rows and columns of the         *
+C              ROMBERG scheme. (N > 1)                           *
+C     H      - starting step size for which the following must   *
+C              hold:                                             *
+C                    H = (B-A) / K  for  K a positive integer.   *
+C              If H was chosen wrongly, H is interally set to    *
+C              equal (B-A) (without any specific error message). *
+C     FCT    - function to be integrated.                        *
+C              It has to be provided by the user in the following*
+C              format:                                           *
+C                     DOUBLE PRECISION FUNCTION  FCT (x).        *
+C              The function has to be defined as EXTERNAL in the *
+C              calling program.                                  *
+C     EL     - auxiliary vector of length N at least.            *
+C              In EL the current row of the ROMBERG scheme       *
+C              is stored.                                        *
+C                                                                *
+C                                                                *
+C     OUTPUT PARAMETERS:                                         *
+C     ==================                                         *
+C     RESULT - approximate value for the integral at the end of  *
+C              the procedure                                     *
+C     ERREST - error estimate for the approximate value RESULT   *
+C     N      - number of rows (columns) of the ROMBERG scheme    *
+C              that were actually determined                     *
+C     H      - step size at end of calculations                  *
+C     IERR   - error parameter,                                  *
+C                IERR = 0 : everything o.k. ERREST &lt; EPS         *
+C                IERR = 1 : incorrect input parameters :         *
+C                            N &lt; 1 or EPS &lt; 0.0  .               *
+C                IERR = 2 : required accuracy was not achieved   *
+C                           after N steps, i.e., ERREST > EPS .  *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required : none                                   *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author   : Richard Reuter  (1983, FORTRAN IV)                 *
+C  editor   : Gisela Engeln-Muellges (1988)                      *
+C  editor   : Norbert Vogt                                       *
+C  date     : 01.31.1990                                         *
+C  source   : FORTRAN 77                                         *
+C                                                                *
+C*****************************************************************
+C
+C  declarations
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DIMENSION  EL(N)
+C
+C  testing the input data
+C
+      IERR = 1
+      IF (N .LE. 1 .OR. EPS .LE. 0.0D0) RETURN
+      IF (A .EQ. B) THEN
+         RESULT = 0.0D0
+         N      = 0
+         ERREST = 0.0D0
+         IERR   = 0
+         H      = 0.0D0
+         R E T U R N
+      ENDIF
+C
+C  determine the starting step size;
+C  determine the number N0 of sub-intervals
+C
+      H = DMIN1(DABS(H),DABS(B-A))
+      IF (B .LT. A)  H = -H
+      IF (H .EQ. 0.0D0) H = B - A
+      N0 = (B - A + 0.5D0*H)/H
+C
+C  determine the first row of the ROMBERG scheme
+C
+      IERR  = 0
+      EL(1) = 0.5D0 * (FCT(A) + FCT(B))
+      IF (N0 .NE. 1) THEN
+         DO 10  L = 2, N0
+            EL(1) = EL(1) + FCT(A + (L-1)*H)
+ 10      CONTINUE
+      END IF
+C
+C  approximate integral from the first ROMBERG scheme row
+C
+      EL(1) = H * EL(1)
+C
+C  determine further rows of the ROMBERG scheme
+C
+      DO 20 K = 2, N
+         EL(K) = 0.0D0
+         H     = H*0.5D0
+         EL1   = EL(1)
+         EL(1) = 0.0D0
+         DO 30 L = 1, N0
+            EL(1) = EL(1) + FCT(A + (2*L-1)*H)
+ 30      CONTINUE
+         EL(1) = EL(1)*H + EL1*0.5D0
+         N0    = 2 * N0
+C
+C  determine the linear combination in the K-th row
+C
+         MM = 1
+         DO 40 M = 2, K
+            MM    = MM * 4
+            EL2   = EL(M)
+            EL(M) = (MM * EL(M-1) - EL1) / (MM-1)
+            EL1   = EL2
+ 40      CONTINUE
+C
+C  determine an estimate for the error of RESULT
+C
+         ERREST = DABS(EL(K) - EL(K-1))
+C
+C  decide upon stopping the procedure
+C
+         IF (ERREST .LT. EPS) THEN
+            RESULT = EL(K)
+            N      = K
+            R E T U R N
+         ENDIF
+ 20   CONTINUE
+      IERR   = 2
+      RESULT = EL(N)
+      R E T U R N
+      END
+</font>
+</pre>
+<a name="ende"</a>
+<hr>
+<a href="#anfang">Begin of file</a><br>
+<a href="../../inhalt.htm#fortra77kap15quaromfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+</body>
+</html>

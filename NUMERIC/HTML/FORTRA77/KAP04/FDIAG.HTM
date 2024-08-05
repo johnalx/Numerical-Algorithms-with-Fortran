@@ -1,0 +1,323 @@
+<html>
+<head>
+<title>fortra77/kap04/fdiag.for</title>
+</head>
+<body>
+<a name="anfang"</a>
+<hr>
+<a href="#ende">End of file</a><br>
+<a href="../../inhalt.htm#fortra77kap04fdiagfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+<font size=+2>
+<pre>
+
+
+
+</pre><u><h1>F 4.12.1  Systems with Five-Diagonal Matrices</h1></u><pre>
+
+<a name="FDIAG8"</a>      SUBROUTINE FDIAG (N,DL2,DL1,DM,DU1,DU2,RS,X,MARK)
+C
+C*****************************************************************
+C                                                                *
+C     Solving a system of linear equations                       *
+C                      A * X = RS                                *
+C     with a five-diagonal, strongly nonsingular matrix A via    *
+C     Gauss algorithm without pivoting.                          *
+C     The matrix A is given as five N-vectors DL2, DL1, DM, DU1  *
+C     and DU2. The linear system has the form:                   *
+C                                                                *
+C     DM(1)*X(1)+DU1(1)*X(2)+DU2(1)*X(3)             = RS(1)     *
+C     DL1(2)*X(1)+DM(2)*X(2)+DU1(2)*X(3)+DU2(2)*X(4) = RS(2)     *
+C                                                                *
+C     DL2(I)*X(I-2)+DL1(I)*X(I-1)+                               *
+C           +DM(I)*X(I)+DU1(I)*X(I+1)+DU2(I)*X(I+2)  = RS(I)     *
+C            for I = 3, ..., N - 2, and                          *
+C                                                                *
+C     DL2(N-1)*X(N-3)+DL1(N-1)*X(N-2)+                           *
+C             +DM(N-1)*X(N-1)+DU1(N-1)+X(N)          = RS(N-1)   *
+C     DL2(N)*X(N-2)+DL1(N)*X(N-1)+DM(N)*X(N)         = RS(N)     *
+C                                                                *
+C                                                                *
+C                                                                *
+C     INPUT PARAMETERS:                                          *
+C     =================                                          *
+C     N     : number of equations; N > 3                         *
+C     DL2   : N-vector DL2(1:N); second lower co-diagonal        *
+C             DL2(3), DL2(4), ... , DL2(N)                       *
+C     DL1   : N-vector DL1(1:N); lower co-diagonal               *
+C             DL1(2), DL1(3), ... , DL1(N)                       *
+C     DM    : N-vector DM(1:N); main diagonal                    *
+C             DM(1), DM(2), ... , DM(N)                          *
+C     DU1   : N-vector DU1(1:N); upper co-diagonal               *
+C             DU1(1), DU1(2), ... , DU1(N-1)                     *
+C     DU2   : N-vector DU2(1:N); second upper co-diagonal        *
+C             DU2(1), DU2(2), ... , DU2(N-2)                     *
+C     RS    : N-vector RS(1:N); the right hand side of the       *
+C             linear system                                      *
+C                                                                *
+C                                                                *
+C     OUTPUT PARAMETERS:                                         *
+C     ==================                                         *
+C     DL2   :) overwritten with auxiliary vectors defining the   *
+C     DL1   :) factorization of the cyclically tridiagonal       *
+C     DM    :) matrix A                                          *
+C     DU1   :)                                                   *
+C     DU2   :)                                                   *
+C     X     : N-vector X(1:N); containing the solution of the    *
+C             the system of equations                            *
+C     MARK  : error parameter                                    *
+C             MARK=-1 : condition N > 3 is not satisfied         *
+C             MARK= 0 : numerically the matrix A is not strongly *
+C                       nonsingular                              *
+C             MARK= 1 : everything is o.k.                       *
+C                                                                *
+C     NOTE: if MARK = 1, the determinant of A is given by:       *
+C                DET A = DM(1) * DM(2) * ... * DM(N)             *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: FDIAGP, FDIAGS, MACHPD                  *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author   : Gisela Engeln-Muellges                             *
+C  date     : 05.06.1988                                         *
+C  source   : FORTRAN 77                                         *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DOUBLE PRECISION DL1(1:N),DL2(1:N),DM(1:N)
+      DOUBLE PRECISION DU1(1:N),DU2(1:N),RS(1:N),X(1:N)
+      MARK = -1
+      IF (N .LT. 4) RETURN
+C
+C  Factor the matrix A
+C
+      CALL FDIAGP(N,DL2,DL1,DM,DU1,DU2,MARK)
+C
+C  if MARK = 1, update and bachsubstitute
+C
+      IF (MARK .EQ. 1) THEN
+           CALL FDIAGS(N,DL2,DL1,DM,DU1,DU2,RS,X)
+      END IF
+      RETURN
+      END
+C
+C
+
+<a name="FDIAGP104"</a>      SUBROUTINE FDIAGP (N,DL2,DL1,DM,DU1,DU2,MARK)
+C
+C*****************************************************************
+C                                                                *
+C     Factor a five-diagonal, strongly nonsingular matrix A      *
+C     that is defined by the five N-vectors DL2, DL1, DM, DU1    *
+C     and DU2, into its triangular factors  L * R  by applying   *
+C     Gaussian elimination specialized for five-diagonal matrices*
+C     (without pivoting).                                        *
+C                                                                *
+C                                                                *
+C     INPUT PARAMETERS:                                          *
+C     =================                                          *
+C     N     : number of equations; N > 3                         *
+C     DL2   : N-vector DL2(1:N); second lower co-diagonal        *
+C             DL2(3), DL2(4), ... , DL2(N)                       *
+C     DL1   : N-vector DL1(1:N); lower co-diagonal               *
+C             DL1(2), DL1(3), ... , DL1(N)                       *
+C     DM    : N-vector DM(1:N); main diagonal                    *
+C             DM(1), DM(2), ... , DM(N)                          *
+C     DU1   : N-vector DU1(1:N); upper co-diagonal               *
+C             DU1(1), DU1(2), ... , DU1(N-1)                     *
+C     DU2   : N-vector DU2(1:N); second upper co-diagonal        *
+C             DU2(1), DU2(2), ... , DU2(N-2)                     *
+C                                                                *
+C                                                                *
+C     OUTPUT PARAMETERS:                                         *
+C     ==================                                         *
+C     DL2   :) overwritten with auxiliary vectors that define    *
+C     DL1   :) the factors of the five-diagonal matrix A;        *
+C     DM    :) the three co-diagonals of the lower triangular    *
+C     DU1   :) matrix L are stored in the vectors DL2, DL1 and   *
+C     DU2   :) DM. The two co-diagonals of the unit upper        *
+C              triangular matrix R are stored in the vectors DU1 *
+C              and DU2, its diagonal elements each have the      *
+C              value  1.                                         *
+C     MARK  : error parameter                                    *
+C             MARK=-1 : condition N > 3 is violated              *
+C             MARK= 0 : numerically the matrix is not strongly   *
+C                       nonsingular                              *
+C             MARK= 1 : everything is o.k.                       *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: MACHPD                                  *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author   : Gisela Engeln-Muellges                             *
+C  date     : 05.06.1988                                         *
+C  source   : FORTRAN 77                                         *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DOUBLE PRECISION DL2(1:N),DL1(1:N),DM(1:N),DU1(1:N),DU2(1:N)
+C
+C  testing whether N > 3
+C
+      MARK = -1
+      IF (N .LT. 4) RETURN
+C
+C  calculating the machine constant
+C
+      FMACHP = 1.0D0
+   10 FMACHP = 0.5D0 * FMACHP
+      IF (MACHPD(1.0D0+FMACHP) .EQ. 1) GOTO 10
+      FMACHP = FMACHP * 2.0D0
+C
+C  determining relative error bounds
+C
+      EPS = 4.0D0 * FMACHP
+C
+C  initializing the undefined vector components
+C
+      DL2(1) = 0.0D0
+      DL2(2) = 0.0D0
+      DL1(1) = 0.0D0
+      DU1(N) = 0.0D0
+      DU2(N-1) = 0.0D0
+      DU2(N) = 0.0D0
+C
+C  factoring the matrix A while checking for strong nonsingularity
+C  for N=1, 2
+C
+      ROW = DABS(DM(1)) + DABS(DU1(1)) + DABS(DU2(1))
+      IF (ROW .EQ. 0.0D0) THEN
+         MARK = 0
+         RETURN
+      ENDIF
+      D = 1.0D0/ROW
+      IF (DABS(DM(1))*D .LE. EPS) THEN
+         MARK = 0
+         RETURN
+      ENDIF
+      DU1(1) = DU1(1)/DM(1)
+      DU2(1) = DU2(1)/DM(1)
+      ROW = DABS(DL1(2)) + DABS(DM(2)) + DABS(DU1(2)) + DABS(DU2(2))
+      IF (ROW .EQ. 0.0D0) THEN
+         MARK = 0
+         RETURN
+      ENDIF
+      D = 1.0D0/ROW
+      DM(2) = DM(2)-DL1(2)*DU1(1)
+      IF (DABS(DM(2))*D .LE. EPS) THEN
+         MARK = 0
+         RETURN
+      ENDIF
+      DU1(2) = (DU1(2)-DL1(2)*DU2(1))/DM(2)
+      DU2(2) = DU2(2)/DM(2)
+C
+C  factoring A while checking for strong nonsingularity of A
+C
+      DO 20 I=3,N,1
+         ROW = DABS(DL2(I))+DABS(DL1(I))+DABS(DM(I))+
+     +         DABS(DU1(I))+DABS(DU2(I))
+         IF (ROW .EQ. 0.0D0) THEN
+            MARK = 0
+            RETURN
+         ENDIF
+         D = 1.0D0/ROW
+         DL1(I) = DL1(I)-DL2(I)*DU1(I-2)
+         DM(I) = DM(I)-DL2(I)*DU2(I-2)-DL1(I)*DU1(I-1)
+         IF (DABS(DM(I))*D .LE. EPS) THEN
+            MARK = 0
+            RETURN
+         ENDIF
+         IF (I .LT. N) THEN
+            DU1(I) = (DU1(I)-DL1(I)*DU2(I-1))/DM(I)
+         ENDIF
+         IF (I .LT. (N-1)) THEN
+            DU2(I) = DU2(I)/DM(I)
+         ENDIF
+   20 CONTINUE
+      MARK = 1
+      RETURN
+      END
+C
+C
+
+<a name="FDIAGS249"</a>      SUBROUTINE FDIAGS (N,DL2,DL1,DM,DU1,DU2,RS,X)
+C
+C*****************************************************************
+C                                                                *
+C     Solving a linear system of equations                       *
+C                A * X = RS                                      *
+C     for a five-diagonal, strongly nonsingular matrix A, once   *
+C     the factor matrices L * R have been calculated by          *
+C     SUBROUTINE FDIAGP.                                         *
+C     Here they are used as input arrays and                     *
+C     they are stored in the five N-vectors DL2, DL1, DM, DU1    *
+C     and DU2.                                                   *
+C                                                                *
+C                                                                *
+C     INPUT PARAMETERS:                                          *
+C     =================                                          *
+C     N     : number of equations; N > 3                         *
+C     DL2   : N-vector DL2(1:N); ) lower triangular matrix L     *
+C     DL1   : N-vector DL1(1:N); ) including the diagonal        *
+C     DM    : N-vector DM(1:N);  ) elements                      *
+C                                                                *
+C     DU1   : N-vector DU1(1:N); ) unit upper triangular matrix  *
+C     DU2   : N-vector DU2(1:N); ) R without its unit diagonal   *
+C                                   elements                     *
+C     RS    : N-vector RS1(1:N); right side of the linear system *
+C                                                                *
+C                                                                *
+C     OUTPUT PARAMETERS:                                         *
+C     ==================                                         *
+C     X     : N-vector X(1:N); the solution of the linear system *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author   : Gisela Engeln-Muellges                             *
+C  date     : 05.06.1988                                         *
+C  source   : FORTRAN 77                                         *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DOUBLE PRECISION DL2(1:N),DL1(1:N),DM(1:N)
+      DOUBLE PRECISION DU1(1:N),DU2(1:N),RS(1:N),X(1:N)
+C
+C  updating
+C
+      RS(1)=RS(1)/DM(1)
+      RS(2)=(RS(2)-DL1(2)*RS(1))/DM(2)
+      DO 10 I=3,N
+         RS(I)=(RS(I)-DL2(I)*RS(I-2)-DL1(I)*RS(I-1))/DM(I)
+   10 CONTINUE
+C
+C  backsubstitution
+C
+      X(N)=RS(N)
+      X(N-1)=RS(N-1)-DU1(N-1)*X(N)
+      DO 20 I=N-2,1,-1
+         X(I)=RS(I)-DU1(I)*X(I+1)-DU2(I)*X(I+2)
+   20 CONTINUE
+      RETURN
+      END
+</font>
+</pre>
+<a name="ende"</a>
+<hr>
+<a href="#anfang">Begin of file</a><br>
+<a href="../../inhalt.htm#fortra77kap04fdiagfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+</body>
+</html>

@@ -1,0 +1,8 @@
+00index.txt     all files in the current folder with short one line description
+readme.txt      detailed description of current folder
+start.htm       start of the HTML tour of the source codes of the Numerical Library
+numeric/        folder with all source codes of the Library in varying representations
+tools/          folder with various programs to handle the Numerical Library
+all0.dir        list of all files on the CD (with relative paths only)
+all1.dir        like `all0.dir', but augmented by file attributes like dates and sizes of files
+allindex.txt    summary of all files `00index.txt' on the CD

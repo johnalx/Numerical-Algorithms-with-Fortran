@@ -1,0 +1,178 @@
+      SUBROUTINE RKV98 (M, COEFF, QG) 
+!                                                                       
+!*****************************************************************      
+!                                                                *      
+! This subroutine determines the coefficients for the embedding  *      
+! formula RKV9(8) (method of Verner).                            *      
+!                                                                *      
+!                                                                *      
+! INPUT PARAMETERS:                                              *      
+! =================                                              *      
+! M       : Dimension of the matrix COEFF depending on the chosen*      
+!           embedding formula                                    *      
+!                                                                *      
+!                                                                *      
+! OUTPUT PARAMETERS:                                             *      
+! ==================                                             *      
+! COEFF   : 2-dimensional DOUBLE PRECISION array COEFF(1:16,1:M) *      
+!           with the coefficients for the embedding formula      *      
+! QG      : DOUBLE PRECISION value for the global error order    *      
+!                                                                *      
+!                                                                *      
+! LOCAL VARIABLES:                                               *      
+! ================                                               *      
+! H       : DOUBLE PRECISION auxiliary variable                  *      
+!                                                                *      
+!                                                                *      
+!----------------------------------------------------------------*      
+!                                                                *      
+!  required subroutines: none                                    *      
+!                                                                *      
+!*****************************************************************      
+!                                                                *      
+!  Author   : Volker KrÅger                                      *      
+!  Date     : 26.04.1993                                         *      
+!  Source   : FORTRAN 77                                         *      
+!  Sources  : J. H. Verner :                                     *      
+!             Explicit Runge-Kutta methods with estimates of     *      
+!             the local truncation error                         *      
+!             page 772-790                                       *      
+!             SIAM J. NUMER. ANAL., Vol. 15, No. 4, 1978         *      
+!                                                                *      
+!*****************************************************************      
+!                                                                       
+! Declarations                                                          
+!                                                                       
+      DOUBLEPRECISION COEFF (16, M), QG, H 
+!                                                                       
+! Initialize QG                                                         
+!                                                                       
+      QG = 8.0D0 
+!                                                                       
+! Initialize H                                                          
+!                                                                       
+      H = DSQRT (6.0D0) 
+!                                                                       
+! Determine the matrix elements in COEFF                                
+!                                                                       
+!         a - values (see scheme )                                      
+!                                                                       
+      COEFF (2, 1) = 1.0D0 / 12.0D0 
+      COEFF (3, 1) = 1.0D0 / 9.0D0 
+      COEFF (4, 1) = 1.0D0 / 6.0D0 
+      COEFF (5, 1) = (2.0D0 + 2.0D0 * H) / 15.0D0 
+      COEFF (6, 1) = (6.0D0 + 1.0D0 * H) / 15.0D0 
+      COEFF (7, 1) = (6.0D0 - 1.0D0 * H) / 15.0D0 
+      COEFF (8, 1) = 2.0D0 / 3.0D0 
+      COEFF (9, 1) = 1.0D0 / 2.0D0 
+      COEFF (10, 1) = 1.0D0 / 3.0D0 
+      COEFF (11, 1) = 1.0D0 / 4.0D0 
+      COEFF (12, 1) = 4.0D0 / 3.0D0 
+      COEFF (13, 1) = 5.0D0 / 6.0D0 
+      COEFF (14, 1) = 1.0D0 
+      COEFF (15, 1) = 1.0D0 / 6.0D0 
+      COEFF (16, 1) = 1.0D0 
+!                                                                       
+!         b - values (see scheme)                                       
+!                                                                       
+      COEFF (2, 2) = 1.0D0 / 12.0D0 
+      COEFF (3, 2) = 1.0D0 / 27.0D0 
+      COEFF (4, 2) = 1.0D0 / 24.0D0 
+      COEFF (5, 2) = (4.0D0 + 94.0D0 * H) / 375.0D0 
+      COEFF (6, 2) = (9.0D0 - 1.0D0 * H) / 150.0D0 
+      COEFF (7, 2) = (927.0D0 - 347.0D0 * H) / 1250.0D0 
+      COEFF (8, 2) = 2.0D0 / 27.0D0 
+      COEFF (9, 2) = 19.0D0 / 256.0D0 
+      COEFF (10, 2) = 11.0D0 / 144.0D0 
+      COEFF (11, 2) = (5034.0D0 - 271.0D0 * H) / 6144.0D1 
+      COEFF (12, 2) = (5996.0D0 - 3794.0D0 * H) / 405.0D0 
+      COEFF (13, 2) = (3793.0D0 + 2168.0D0 * H) / 1036.80D2 
+      COEFF (14, 2) = - 137.0D0 / 1296.0D0 
+      COEFF (15, 2) = (3361.7D1 - 2168.0D0 * H) / 5184.00D2 
+      COEFF (16, 2) = ( - 3648.7D1 - 3035.2D1 * H) / 2796.00D2 
+      COEFF (3, 3) = 2.0D0 / 27.0D0 
+      COEFF (4, 4) = 1.0D0 / 8.0D0 
+      COEFF (5, 4) = ( - 94.0D0 - 84.0D0 * H) / 125.0D0 
+      COEFF (5, 5) = (328.0D0 + 208.0D0 * H) / 375.0D0 
+      COEFF (6, 5) = (312.0D0 + 32.0D0 * H) / 1425.0D0 
+      COEFF (7, 5) = ( - 1624.8D1 + 7328.0D0 * H) / 9375.0D0 
+      COEFF (6, 6) = (69.0D0 + 29.0D0 * H) / 570.0D0 
+      COEFF (7, 6) = ( - 489.0D0 + 179.0D0 * H) / 3750.0D0 
+      COEFF (7, 7) = (1426.8D1 - 5798.0D0 * H) / 9375.0D0 
+      COEFF (8, 7) = (16.0D0 - 1.0D0 * H) / 54.0D0 
+      COEFF (9, 7) = (118.0D0 - 23.0D0 * H) / 512.0D0 
+      COEFF (10, 7) = (266.0D0 - 1.0D0 * H) / 864.0D0 
+      COEFF (12, 7) = ( - 4342.0D0 - 338.0D0 * H) / 9.0D0 
+      COEFF (13, 7) = (4042.0D0 + 2263.0D0 * H) / 1382.4D1 
+      COEFF (14, 7) = (5642.0D0 - 337.0D0 * H) / 864.0D0 
+      COEFF (15, 7) = ( - 3846.0D0 + 31.0D0 * H) / 1382.4D1 
+      COEFF (16, 7) = ( - 2966.6D1 - 4499.0D0 * H) / 7456.0D0 
+      COEFF (8, 8) = (16.0D0 + 1.0D0 * H) / 54.0D0 
+      COEFF (9, 8) = (118.0D0 + 23.0D0 * H) / 512.0D0 
+      COEFF (10, 8) = (266.0D0 + 1.0D0 * H) / 864.0D0 
+      COEFF (11, 8) = (7859.0D0 - 1626.0D0 * H) / 1024.0D1 
+      COEFF (12, 8) = (1549.22D2 - 4045.8D1 * H) / 135.0D0 
+      COEFF (13, 8) = ( - 2312.78D2 + 4071.7D1 * H) / 6912.0D1 
+      COEFF (14, 8) = (5642.0D0 + 337.0D0 * H) / 864.0D0 
+      COEFF (15, 8) = (1553.38D2 - 5280.7D1 * H) / 3456.00D2 
+      COEFF (16, 8) = (2779.182D3 - 6159.73D2 * H) / 1864.00D2 
+      COEFF (9, 9) = - 9.0D0 / 256.0D0 
+      COEFF (10, 9) = - 1.0D0 / 16.0D0 
+      COEFF (11, 9) = ( - 2232.0D0 + 813.0D0 * H) / 2048.0D1 
+      COEFF (12, 9) = ( - 4176.0D0 + 3794.0D0 * H) / 45.0D0 
+      COEFF (13, 9) = (7947.0D0 - 2168.0D0 * H) / 1152.0D1 
+      COEFF (14, 9) = - 299.0D0 / 48.0D0 
+      COEFF (15, 9) = ( - 1253.7D1 + 2168.0D0 * H) / 5760.0D1 
+      COEFF (16, 9) = ( - 9432.9D1 + 9105.6D1 * H) / 9320.0D1 
+      COEFF (10, 10) = - 8.0D0 / 27.0D0 
+      COEFF (11, 10) = ( - 594.0D0 + 271.0D0 * H) / 960.0D0 
+      COEFF (12, 10) = ( - 3408.64D2 + 2428.16D2 * H) / 405.0D0 
+      COEFF (13, 10) = (1048.0D0 - 542.0D0 * H) / 405.0D0 
+      COEFF (14, 10) = 184.0D0 / 81.0D0 
+      COEFF (15, 10) = (92.0D0 + 542.0D0 * H) / 2025.0D0 
+      COEFF (16, 10) = ( - 2321.92D2 + 1214.08D2 * H) / 1747.5D1 
+      COEFF (11, 11) = (657.0D0 - 813.0D0 * H) / 5120.0D0 
+      COEFF (12, 11) = (2630.4D1 - 1517.6D1 * H) / 45.0D0 
+      COEFF (13, 11) = ( - 1383.0D0 + 542.0D0 * H) / 720.0D0 
+      COEFF (14, 11) = - 44.0D0 / 9.0D0 
+      COEFF (15, 11) = ( - 1797.0D0 - 542.0D0 * H) / 3600.0D0 
+      COEFF (16, 11) = (1012.26D2 - 2276.4D1 * H) / 5825.0D0 
+      COEFF (12, 12) = - 2662.4D1 / 81.0D0 
+      COEFF (13, 12) = 2624.0D0 / 1053.0D0 
+      COEFF (14, 12) = - 5120.0D0 / 1053.0D0 
+      COEFF (15, 12) = 320.0D0 / 567.0D0 
+      COEFF (16, 12) = - 1699.84D2 / 9087.0D0 
+      COEFF (13, 13) = 3.0D0 / 1664.0D0 
+      COEFF (14, 13) = - 11.0D0 / 468.0D0 
+      COEFF (15, 13) = - 1.0D0 / 1920.0D0 
+      COEFF (16, 13) = - 87.0D0 / 3029.0D1 
+      COEFF (14, 14) = 16.0D0 / 9.0D0 
+      COEFF (15, 14) = 4.0D0 / 105.0D0 
+      COEFF (16, 14) = 492.0D0 / 1165.0D0 
+      COEFF (16, 16) = 1260.0D0 / 233.0D0 
+!                                                                       
+!         A tilde values (see scheme)                                   
+!                                                                       
+      COEFF (2, 3) = 23.0D0 / 525.0D0 
+      COEFF (2, 10) = 171.0D0 / 1400.0D0 
+      COEFF (2, 11) = 86.0D0 / 525.0D0 
+      COEFF (2, 12) = 93.0D0 / 280.0D0 
+      COEFF (2, 13) = - 2048.0D0 / 6825.0D0 
+      COEFF (2, 14) = - 3.0D0 / 1820.0D1 
+      COEFF (2, 15) = 39.0D0 / 175.0D0 
+      COEFF (3, 4) = 9.0D0 / 25.0D0 
+      COEFF (3, 5) = 233.0D0 / 4200.0D0 
+!                                                                       
+!          A - values (see scheme)                                      
+!                                                                       
+      COEFF (1, 1) = 103.0D0 / 1680.0D0 
+      COEFF (1, 8) = - 27.0D0 / 140.0D0 
+      COEFF (1, 9) = 76.0D0 / 105.0D0 
+      COEFF (1, 10) = - 201.0D0 / 280.0D0 
+      COEFF (1, 11) = 1024.0D0 / 1365.0D0 
+      COEFF (1, 12) = 3.0D0 / 7280.0D0 
+      COEFF (1, 13) = 12.0D0 / 35.0D0 
+      COEFF (1, 14) = 9.0D0 / 280.0D0 
+                                                                        
+      RETURN 
+      END SUBROUTINE RKV98                          

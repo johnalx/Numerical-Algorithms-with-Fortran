@@ -1,0 +1,92 @@
+C[BA*)
+C[LE*)
+      SUBROUTINE SNLPRE (X, W, PHI, DVT, JNDVT, C, LDA, M, N,
+C[IX{SNLPRE}*)
+     +                   EPS, F, A)
+C
+C*****************************************************************
+C                                                                *
+C  The SUBROUTINE SNLPRE computes the Jacobi matrix (as it is    *
+C  needed in SUBROUTINE SNLFIT), either using a subroutine,      *
+C  denoted by DVT in the program that is provided by the user    *
+C  and which computes the partial derivatives, or by central     *
+C  difference quotients.                                         *
+C[BE*)
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C                                                                *
+C  X, PHI, DVT, JNDVT, C, LDA, M, N      same as SNLFIT          *
+C                                                                *
+C  W     a vector which contains the square roots of the weights *
+C                                                                *
+C  EPS   the machine constant                                    *
+C                                                                *
+C                                                                *
+C  AUXILIARY PARAMETER:                                          *
+C  ====================                                          *
+C                                                                *
+C  F     (N+1)-vector F(0:N), which is needed when calling the   *
+C         user supplied SUBROUTINE DVT                           *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETER:                                             *
+C  =================                                             *
+C                                                                *
+C  A     2-dim. array A(0:LDA,0:N) containing the Jacobi matrix  *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required : none, except possibly DVT, which must  *
+C                         be user supplied if JVDT = 0           *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author   : Ilona Westermann                                   *
+C  date     : 09.01.1987                                         *
+C  source   : FORTRAN 77                                         *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      INTEGER JNDVT, LDA, M, N
+      DIMENSION X(0:M), W(0:M), C(0:N), F(0:N), A(0:LDA,0:N)
+C
+C  determine the partial derivatives using SUBROUTINE DVT
+C
+      IF (JNDVT .EQ. 0) THEN
+         DO 10 I=0,M
+            CALL DVT (X(I), C, N, F)
+            DO 10 K=0,N
+               A(I,K) = F(K)
+   10    CONTINUE
+C
+C  approximate the partial derivatives by central
+C  difference quotients
+C
+      ELSE
+         FACTOR = EPS ** (1.0D0/3.0D0)
+         DO 20 K=0,N
+            IF (C(K) .EQ. 0.0D0) THEN
+               HK = FACTOR
+            ELSE
+               HK = FACTOR * DABS(C(K))
+            ENDIF
+            ZHK = 1.0D0 / (2.0D0 * HK)
+            DO 20 I=0,M
+               C(K) = C(K) + HK
+               DIFQUO = PHI (C, N, X(I))
+               C(K) = C(K) - 2.0D0 * HK
+               A(I,K)  = (DIFQUO - PHI (C, N, X(I))) * ZHK
+               C(K) = C(K) + HK
+   20    CONTINUE
+      ENDIF
+      DO 30 I=0,M
+         DO 30 K=0,N
+            A(I,K) = A(I,K) * W(I)
+   30 CONTINUE
+      RETURN
+      END

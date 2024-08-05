@@ -1,0 +1,697 @@
+C[BA*)
+C[KA{F 3}{Roots of Polynomials}
+C[       {Roots of Polynomials}*)
+C[FE{F 3.3.2}{Muller's Method}{Muller's Method}*)
+C[LE*)
+      SUBROUTINE MULLRP(NPOL,POLYNM,ITERMX, NZ,ZERO,P,PHELPD)
+C[IX{MULLRP}*)
+C
+C*****************************************************************
+C                                                                *
+C  This SUBROUTINE computes all zeros of a polynomial by using   *
+C  the method of Muller.                                         *
+C[BE*)
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  NPOL   : degree of the polynomial                             *
+C  POLYNM : (NPOL+1)-vector POLYNM(0:NPOL) of the polynomial     *
+C           coefficients in ascending order                      *
+C  ITERMX : maximum number of iterations per zero                *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  ==================                                            *
+C  NZ     : number of zeros found                                *
+C  ZERO   : (2,NZ)-array containing the zeros with real their    *
+C           parts stored first and their imaginary parts stored  *
+C           in the second component.                             *
+C                                                                *
+C                                                                *
+C  AUXILIARY VECTORS:                                            *
+C  ==================                                            *
+C  P      : vector P(0:NPOL)  of type DOUBLE PRECISION           *
+C  PHELPD : vector PHELPD(0:NPOL)  of type DOUBLE PRECISION      *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: MULLER, HORNC, HORNCE, POLDIV,          *
+C                        YEPS, COMPAR                            *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author     : Eberhard Heyne                                   *
+C  date       : 06.14.1992                                       *
+C  source     : FORTRAN 77                                       *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+      INTEGER NPOL,NFND,ITERMX,IERR,NZ,NC,N,I,ITMX,NB,NFIRST,NR
+      DOUBLE PRECISION POLYNM(0:NPOL)
+      DOUBLE PRECISION P(0:NPOL)
+      DOUBLE PRECISION ZERO(2,1:NPOL),X0R,X1R,X2R,X0I,X1I,X2I
+      DOUBLE PRECISION F0R,F1R,F2R,F0I,F1I,F2I,F1BQ,F2BQ,F2BQB
+      DOUBLE PRECISION XR,XI,XEPS,YEPS
+      DOUBLE PRECISION BHELPD(0:2),PHELPD(0:NPOL),R(0:1)
+      COMMON /MULLCI/ ITMX
+      COMMON /MULLCD/ X0R,X0I,X1R,X1I,X2R,X2I,
+     &                F0R,F0I,F1R,F1I,F2R,F2I,F1BQ,F2BQ,F2BQB,XEPS
+C
+C     The variable IERR (error indicator) may be added to the parameter list
+C     as an additional output parameter. Since the number NPOL of zeros
+C     of the given polynomial is known, the inquiry (NZ .NE. NPOL) might
+C     suffice if the presence of an error needs to be detected but
+C     the type of this error does not need to be analyzed.
+C
+      DATA NFIRST/0/
+      IF (NFIRST .NE. 1) THEN
+C
+C        Determine machine constant
+C
+         XEPS=YEPS()
+         NFIRST=1
+      ENDIF
+C
+C     Initialize: number NZ of zeros found, error indicator IERR
+C
+      NZ=0
+      IERR=0
+C
+C     Test for meaningful polynomial degree
+C
+      IF (NPOL .LE. 0) THEN
+         IERR=1
+         RETURN
+      ENDIF
+C
+C     Relabel polynomial coefficients and determine the polynomial degree N
+C
+      N=-1
+      DO 10 I=0,NPOL
+         P(I)=POLYNM(I)
+         IF (DABS(P(I)) .NE. 0.0D0) N=I
+10    CONTINUE
+      IF (N .LE. 0) THEN
+         IF (N .EQ. -1) THEN
+C
+C           The polynomial is identically equal to zero
+C
+            IERR=2
+            RETURN
+         ELSE IF (N .EQ. 0) THEN
+C
+C           The polynomial is identical to a constant different from zero
+C
+            IERR=3
+            RETURN
+         ENDIF
+      ENDIF
+12    CONTINUE
+      IF (N .EQ. 0) THEN
+         IERR=4
+         RETURN
+      ENDIF
+      IF (N .EQ. 1) THEN
+C
+C        Solve the linear polynomial if the degree is 1
+C
+         NZ=NZ+1
+         ZERO(1,NZ)=-P(0)/P(1)
+         ZERO(2,NZ)=0.0D0
+         RETURN
+      ENDIF
+C
+C     Preset the number ITMX of iteration steps allowed per zero
+C
+      ITMX=ITERMX
+C
+C     Automatic start
+C
+      X0R=-1.0D0
+      F0R=P(0)-P(1)+P(2)
+      X1R=1.0D0
+      F1R=P(0)+P(1)+P(2)
+      X2R=0.0D0
+      F2R=P(0)
+      X0I=0.0D0
+      F0I=0.0D0
+      X1I=0.0D0
+      F1I=0.0D0
+      X2I=0.0D0
+      F2I=0.0D0
+C
+C     Muller-iteration for one zero
+C
+      CALL MULLER(N,P,NFND,XR,XI,PHELPD)
+      IF (NFND .EQ. 0) RETURN
+      IF (NFND .EQ. 1) THEN
+C
+C        A real zero
+C
+         NZ=NZ+1
+         ZERO(1,NZ)=XR
+         ZERO(2,NZ)=0.0D0
+         BHELPD(1)=1.0D0
+         BHELPD(0)=-XR
+         NB=1
+      ELSE IF (NFND .EQ. 2) THEN
+C
+C        If a real polynomial has a complex zero,
+C        then its complex-conjugate is a zero as well
+C
+         NZ=NZ+1
+         ZERO(1,NZ)=XR
+         ZERO(2,NZ)=XI
+         NZ=NZ+1
+         ZERO(1,NZ)=XR
+         ZERO(2,NZ)=-XI
+         BHELPD(2)=1.0D0
+         BHELPD(1)=-(XR+XR)
+         BHELPD(0)=+(XR**2+XI**2)
+         NB=2
+      ENDIF
+C
+C     Deflate by the found zero(s)
+C
+      CALL POLDIV(P,N,BHELPD,NB,PHELPD,NC,R,NR)
+      DO 14 I=0,NC
+         P(I)=PHELPD(I)
+14    CONTINUE
+      N=NC
+      IF (ITMX .NE. 0) GOTO 12
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE MULLER(N,P,NFND,XR,XI,PHELPD)
+C[IX{MULLER}*)
+C[BE*)
+C
+C*****************************************************************
+C                                                                *
+C  Auxiliary routine for MULLRP                                  *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: HORNC, HORNCE                           *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author     : Eberhard Heyne                                   *
+C  date       : 06.14.1992                                       *
+C  source     : FORTRAN 77                                       *
+C                                                                *
+C*****************************************************************
+C
+      INTEGER N,NFND,ITMX
+      DOUBLE PRECISION P(0:N),F1BQ
+      DOUBLE PRECISION F2BQ,F2BQB,XEPS,XEFR,XEFI,XEB1,XEB0,FF
+      DOUBLE PRECISION H1R,H1I,H1BQ,H2R,H2I,HHR,HHI,HXR,HXI,HYR,HYI
+      DOUBLE PRECISION WSIN,WCOS,WBQ,WSINH,WCOSH
+      DOUBLE PRECISION AR,AI,BR,BI,CR,CI,QR,QI,WNR,WNI
+      DOUBLE PRECISION XN1R,XN1I,XN1BQ,XN2R,XN2I,XN2BQ
+      DOUBLE PRECISION XR,XI,FR,FI,XBR,XBI,PHELPD(0:N)
+      DOUBLE PRECISION X0R,X1R,X2R,X0I,X1I,X2I
+      DOUBLE PRECISION F0R,F1R,F2R,F0I,F1I,F2I
+      DOUBLE PRECISION AHR,AHI,BHR,BHI,CMLR,CMLI
+      COMMON /MULLCI/ ITMX
+      COMMON /MULLCD/ X0R,X0I,X1R,X1I,X2R,X2I,
+     &                F0R,F0I,F1R,F1I,F2R,F2I,F1BQ,F2BQ,F2BQB,XEPS
+C
+C     Complex multiplication: the real part
+C
+      CMLR(AHR,AHI,BHR,BHI)=AHR*BHR-AHI*BHI
+C
+C     Complex multiplication: the imaginary part
+C
+      CMLI(AHR,AHI,BHR,BHI)=AHR*BHI+AHI*BHR
+C
+C     The number FF helps decide whether one should iterate further
+C     when the computed functional values increase or whether the value
+C     with the smallest absolute functional value so far attained is
+C     acceptable as a zero.
+C     FF=10 means that one decimal place of the computed functional value
+C     must be correct. FF=1 means that we only test whether the absolute
+C     value of the functional value is less than the rounding error.
+C
+      DATA FF/10.0D0/
+C
+C     Automatic start
+C
+C     H1=X1-X0
+C     H2=X2-X1
+C     Q=H2/H1
+C
+      H1R=X1R-X0R
+      H1I=0.0D0
+      H2R=X2R-X1R
+      H2I=0.0D0
+C
+C     Q=H2R/H1R
+C
+      H1BQ=H1R**2+H1I**2
+      QR=CMLR(H2R,H2I,H1R/H1BQ,-H1I/H1BQ)
+      QI=CMLI(H2R,H2I,H1R/H1BQ,-H1I/H1BQ)
+      F1BQ=1.0D38
+      F2BQ=1.0D38
+      XBR=X2R
+      XBI=0.0D0
+      F2BQB=1.0D38
+10    CONTINUE
+C
+C     A=Q*F2-Q*(1+Q)*F1+Q**2*F0
+C     B=(2.*Q+1.)*F2-(1+Q)**2*F1+Q**2*F0
+C     C=(1.+Q)*F2
+C
+      HHR=CMLR(QR,QI,QR,QI)
+      HHI=CMLI(QR,QI,QR,QI)
+C
+C     Compute        A=Q*(F2-F1) + Q**2*(F0-F1)
+C     instead of     A=Q*F2-Q*(1+Q)*F1+Q**2*F0
+C
+      HXR=F2R-F1R
+      HXI=F2I-F1I
+      HYR=F0R-F1R
+      HYI=F0I-F1I
+      AR=CMLR(QR,QI,HXR,HXI)+CMLR(HHR,HHI,HYR,HYI)
+      AI=CMLI(QR,QI,HXR,HXI)+CMLI(HHR,HHI,HYR,HYI)
+C
+C     Compute         B=F2-F1+ 2.*Q*(F2-F1)+Q**2*(F0-F1)
+C     instead of      B=(2.*Q+1.)*F2-(1+Q)**2*F1+Q**2*F0
+C
+      BR=HXR+2.0D0*CMLR(QR,QI,HXR,HXI)+CMLR(HHR,HHI,HYR,HYI)
+      BI=HXI+2.0D0*CMLI(QR,QI,HXR,HXI)+CMLI(HHR,HHI,HYR,HYI)
+C
+C     C=(1.+Q)*F2
+C
+      CR=F2R+CMLR(QR,QI,F2R,F2I)
+      CI=F2I+CMLI(QR,QI,F2R,F2I)
+C
+C     The square-root expression appearing in the denominator
+C     of the expression for Q
+C
+C     WN=B**2-4.*A*C  und WN=SQRT(WN)
+C
+      WNR=CMLR(BR,BI,BR,BI)-4.0D0*CMLR(AR,AI,CR,CI)
+      WNI=CMLI(BR,BI,BR,BI)-4.0D0*CMLI(AR,AI,CR,CI)
+      IF (WNR*WNR+WNI*WNI .GE. 1.0D-40) THEN
+         WBQ=DSQRT(WNR*WNR+WNI*WNI)
+         WSIN=WNI/WBQ
+         WCOS=WNR/WBQ
+C
+C        Half-angle formula
+C
+         WSINH=DSIGN(1.0D0,WSIN)*DSQRT((1.0D0-WCOS)*0.5D0)
+         WCOSH=DSQRT((1.0D0+WCOS)*0.5D0)
+         WBQ=DSQRT(WBQ)
+         WNR=WBQ*WCOSH
+         WNI=WBQ*WSINH
+      ELSE
+         WNR=0.0D0
+         WNI=0.0D0
+      ENDIF
+C
+C     The two possible denominators for this root
+C
+      XN1R=BR+WNR
+      XN1I=BI+WNI
+      XN1BQ=XN1R**2+XN1I**2
+      XN2R=BR-WNR
+      XN2I=BI-WNI
+      XN2BQ=XN2R**2+XN2I**2
+C
+C     The denominator with the larger absolute value determines the X
+C     closest to X2
+C
+      IF (XN1BQ .GT. XN2BQ) THEN
+C
+C        Q=-2.*C/XN1
+C
+         QR=-(2.0D0/XN1BQ)*CMLR(CR,CI,XN1R,-XN1I)
+         QI=-(2.0D0/XN1BQ)*CMLI(CR,CI,XN1R,-XN1I)
+      ELSE IF (XN2BQ .GT. 0.0D0) THEN
+C
+C        Q=-2.*C/XN2
+C
+         QR=-(2.0D0/XN2BQ)*CMLR(CR,CI,XN2R,-XN2I)
+         QI=-(2.0D0/XN2BQ)*CMLI(CR,CI,XN2R,-XN2I)
+      ELSE
+C
+C        The denominator is zero;
+C        Follow the suggestion by Muller: set Q=1 and continue calculations
+C
+C        Q=(1.,0.)
+C
+         QR=1.0D0
+         QI=0.0D0
+      ENDIF
+C
+C     Prepare the next iteration,
+C     in which some instructions become redundant; we will
+C     label them as comment lines: C   ...
+C
+C     X0=X1
+C     X1=X2
+C     H1=H2
+C
+      F0R=F1R
+      F0I=F1I
+      F1R=F2R
+      F1I=F2I
+C     X0R=X1R
+C     X0I=X1I
+C     X1R=X2R
+C     X1I=X2I
+C     H1R=H2R
+C     H1I=H2I
+C
+C     The new value of H2 is calculated before the new X iterate
+C
+      F1BQ=F2BQ
+C
+C     H2=H2*Q
+C
+      HHR=CMLR(H2R,H2I,QR,QI)
+      H2I=CMLI(H2R,H2I,QR,QI)
+      H2R=HHR
+      X2R=X2R+H2R
+      X2I=X2I+H2I
+12    CONTINUE
+C
+C     Determine the functional value
+C
+      XR=X2R
+      XI=X2I
+      CALL HORNC(P,N,XR,XI,FR,FI,PHELPD)
+      F2R=FR
+      F2I=FI
+      F2BQ=FR**2+FI**2
+C
+C     Decrease the iteration counter
+C
+      ITMX=ITMX-1
+      IF (ITMX .EQ. 0) THEN
+C
+C        Maximal number of iterations has been reached
+C
+C
+C        Error estimate for the x-value with the minimal
+C        absolute value of the function
+C
+         CALL HORNCE(XEPS,XEFR,XEFI,XEB1,XEB0,P,N,XBR,XBI,FR,FI,PHELPD)
+C
+C        Determine whether the x-value with the smallest absolute
+C        functional value so far found can be regarded as a zero
+C
+         IF (DABS(FR)+DABS(FI) .LE. FF*(DABS(XEFR)+DABS(XEFI))) THEN
+            XR=XBR
+            XI=XBI
+            GOTO 14
+         ELSE
+            NFND=0
+            RETURN
+         ENDIF
+      ENDIF
+C
+C     Muller-modification for improved convergence
+C
+      IF (F2BQ .GT. 100.0D0*F1BQ) THEN
+         QR=QR/2.0D0
+         QI=QI/2.0D0
+C
+C        H2 and X2 already contain the old Q
+C
+         H2R=H2R/2.0D0
+         H2I=H2I/2.0D0
+         X2R=X2R-H2R
+         X2I=X2I-H2I
+         GOTO 12
+      ENDIF
+C
+C     As long as the absolute value of the functional values decreases,
+C     we can hope for an improvement
+C
+      IF (F2BQ .LT. F1BQ) THEN
+         IF (F2BQ .LT. F2BQB) THEN
+C
+C          The absolute value of the new function value is less than
+C          the minimal value so far
+C
+            F2BQB=F2BQ
+            XBR=XR
+            XBI=XI
+         ENDIF
+C
+C       We do not continue iterating for an exakt zero
+C
+         IF (F2BQ .NE. 0.0D0) GOTO 10
+      ELSE
+C
+C        Error estimate the same as for the x-value that, so far, represented
+C        the minimal absolute function value
+C
+         CALL HORNCE(XEPS,XEFR,XEFI,XEB1,XEB0,P,N,XBR,XBI,FR,FI,PHELPD)
+C
+C        Check whether iteration is to be continued
+C
+         XR=XBR
+         XI=XBI
+         IF (DABS(FR)+DABS(FI) .GE. FF*(DABS(XEFR)+DABS(XEFI))) GOTO 10
+      ENDIF
+14    CONTINUE
+C
+C     Using an error estimate we determine whether the root
+C     may be real
+C
+      IF (DABS(PHELPD(1))+DABS(PHELPD(0)) .LE. FF*(XEB1+XEB0)) THEN
+C
+C        Complex-conjugate pair of zeros
+C
+         NFND=2
+      ELSE
+C
+C        A real solution
+C
+         NFND=1
+         XI=0.0D0
+      ENDIF
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE HORNC(A,NA,XR,XI,FR,FI,B)
+C[IX{HORNC}*)
+C[BE*)
+C
+C*****************************************************************
+C                                                                *
+C  auxiliary routine for MULLRP                                  *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author     : Eberhard Heyne                                   *
+C  date       : 05.09.1988                                       *
+C  source     : FORTRAN 77                                       *
+C                                                                *
+C*****************************************************************
+C
+C     Simple Horner-scheme for a COMPLEX argument
+C
+      INTEGER NA,I
+      DOUBLE PRECISION A(0:NA)
+      DOUBLE PRECISION XR,XI,FR,FI,P,Q,B(0:NA)
+      P=XR+XR
+      Q=-(XR**2+XI**2)
+      B(NA)=A(NA)
+      B(NA-1)=A(NA-1)+P*B(NA)
+      DO 10 I=NA-2,1,-1
+         B(I)=A(I)+Q*B(I+2)+P*B(I+1)
+10    CONTINUE
+      B(0)=A(0)+Q*B(2)
+      FR=B(1)*XR+B(0)
+      FI=B(1)*XI
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE HORNCE(XEPS,XEFR,XEFI,XEB1,XEB0,A,NA,XR,XI,FR,FI,B)
+C[IX{HORNCE}*)
+C[BE*)
+C
+C*****************************************************************
+C                                                                *
+C  auxiliary routine for MULLRP                                  *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author     : Eberhard Heyne                                   *
+C  date       : 06.14.1992                                       *
+C  source     : FORTRAN 77                                       *
+C                                                                *
+C*****************************************************************
+C
+C     This SUBROUTINE is very similar to HORNC except that
+C     error estimates are carried out for each instruction.
+C
+C     XEFR   error estimate of the real part of F      ( FR )
+C     XEFI   error estimate of the imaginary part F of ( FI )
+C     XEB1   error estimate of B(1)
+C     XEB0   error estimate of B(0)
+C
+      INTEGER NA,I
+      DOUBLE PRECISION A(0:NA)
+      DOUBLE PRECISION XEPS,XEP,XEQ,XEB0,XEB1,XEB2,XEFR,XEFI
+      DOUBLE PRECISION XR,XI,FR,FI,P,Q,B(0:NA)
+      P=XR+XR
+      XEP=DABS(P)*XEPS
+      Q=-(XR**2+XI**2)
+      XEQ=DABS(Q)*XEPS
+      B(NA)=A(NA)
+      XEB2=0.0D0
+      B(NA-1)=A(NA-1)+P*B(NA)
+      XEB1=XEP*DABS(B(NA))+XEPS*(DABS(B(NA-1)))
+      DO 10 I=NA-2,1,-1
+         B(I)=A(I)+Q*B(I+2)+P*B(I+1)
+         XEB0=XEQ*DABS(B(I+2))+XEP*DABS(B(I+1))+
+     &        XEB2*DABS(Q)+XEB1*DABS(P)+XEPS*(DABS(B(I))+DABS(A(I)))
+         XEB2=XEB1
+         XEB1=XEB0
+10    CONTINUE
+      B(0)=A(0)+Q*B(2)
+      XEB0=XEQ*DABS(B(2))+XEB2*DABS(Q)+XEPS*(DABS(B(0))+DABS(A(0)))
+      FR=B(1)*XR+B(0)
+      XEFR=XEB1*DABS(XR)+XEB0
+      FI=B(1)*XI
+      XEFI=XEB1*DABS(XI)
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE POLDIV(A,NA,B,NB,C,NC,R,NR)
+C[IX{POLDIV}*)
+C[BE*)
+C
+C*****************************************************************
+C                                                                *
+C  auxiliary routine for MULLRP                                  *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  Subroutines required: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author     : Eberhard Heyne                                   *
+C  date       : 05.09.1988                                       *
+C  source     : FORTRAN 77                                       *
+C                                                                *
+C*****************************************************************
+C
+      INTEGER NA,NB,NC,NR,IC,K,M,IR
+      DOUBLE PRECISION A(0:NA)
+      DOUBLE PRECISION B(0:NB),C(0:*),SUM,R(0:*)
+C
+C     Long division of polynomials:
+C     determine polynomials C, R so that the following
+C     holds:  A = B * C + R, i.e., C = A/B with remainder R
+C
+      NC=NA-NB
+      DO 10 IC=NC,0,-1
+         K=IC+NB
+         SUM=A(K)
+         DO 12 M=IC+1,MIN(NC,K)
+            SUM=SUM-B(K-M)*C(M)
+12       CONTINUE
+         C(IC)=SUM/B(NB)
+10    CONTINUE
+      NR=NB-1
+      DO 14 IR=0,NR
+         SUM=A(IR)
+         DO 16 M=0,IR
+            SUM=SUM-B(IR-M)*C(M)
+16       CONTINUE
+         R(IR)=SUM
+14    CONTINUE
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      DOUBLE PRECISION FUNCTION YEPS()
+C[IX{YEPS}*)
+C[BE*)
+C
+C*****************************************************************
+C                                                                *
+C  auxiliary routine for MULLRP                                  *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: COMPAR                                  *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author     : Eberhard Heyne                                   *
+C  date       : 05.09.1988                                       *
+C  source     : FORTRAN 77                                       *
+C                                                                *
+C*****************************************************************
+C
+      DOUBLE PRECISION R,S
+      INTEGER M
+C
+C     Function that determines the machine constant
+C
+      S=1.0D0
+10    R=S
+      S=S/2.0D0
+      CALL COMPAR(M,1.0D0+S,1.0D0+R)
+      IF (M .NE. 0) GOTO 10
+      YEPS=R
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE COMPAR(M,A,B)
+C[IX{COMPAR}*)
+C[BE*)
+C
+C*****************************************************************
+C                                                                *
+C  auxiliary routine for MULLRP                                  *
+C                                                                *
+C*****************************************************************
+C
+      DOUBLE PRECISION A,B
+      INTEGER M
+C
+C     The reason behind this routine is to avoid internal
+C     compiler optimizations and to force storing the values
+C     for A and B.
+C
+      M=1
+      IF (A .EQ. B) M=0
+      RETURN
+      END

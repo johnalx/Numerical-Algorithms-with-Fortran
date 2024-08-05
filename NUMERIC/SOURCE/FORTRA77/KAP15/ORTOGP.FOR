@@ -1,0 +1,155 @@
+C[BA*)
+C[LE*)
+C[LE*)
+C[LE*)
+C[FE{F 15.7}
+C[  {Gau"s Quadrature Formulas}{Gau"s Quadrature Formulas}*)
+C[LE*)
+      SUBROUTINE ORTOGP(N,AINT,X,W,IERR,WK,WKD,IWK)
+C[IX{ORTOGP}*)
+C
+C*****************************************************************
+C                                                                *
+C  This subroutine determines the nodes and weights of the       *
+C  generalized GAUSSIAN quadrature formula.                      *
+C[BE*)
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  N   :  number of nodes                                        *
+C  AINT:  vector AINT(0:2*N-1) containing the values AINT(I) of  *
+C         the integral of the function (X**I) * G(X) over        *
+C         specified intervals.                                   *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  ==================                                            *
+C  X   : the vector of nodes for the integration formula.        *
+C  W   : the vector of weights of the integration formula for    *
+C        the above nodes.                                        *
+C  IERR: error parameter:                                        *
+C           if IERR is different from zero, no useable values    *
+C           could be determined, since the linear system of      *
+C           equations for the nodes and weights is too ill-con-  *
+C           ditioned or because the zero finding algorithm could *
+C           not find the zeros reliably.                         *
+C                                                                *
+C  AUXILIARY VARIABLES:                                          *
+C  ====================                                          *
+C  WK    vector WK(1:N**2+4*N+1)                                 *
+C  WKD   DOUBLE PRECISION vector of length N+1                   *
+C  IWK   INTEGER vector of length N                              *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: ORTPOL, GAUSS, MULLRP                   *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author   : Eberhard Heyne                                     *
+C  date     : 05.25.1988                                         *
+C  source   : FORTRAN 77                                         *
+C                                                                *
+C[BA*)
+C*****************************************************************
+C[BE*)
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DIMENSION AINT(0:2*N-1),X(N),W(N),WK(*),IWK(*)
+      DIMENSION WKD(0:*)
+C
+C  WK is a vector of length N**2+4*N+1.
+C  Here this vector is split into several subvectors, that
+C  are partially overlapping, as these are used
+C  successively.
+C  The DOUBLE PRECISION vector WKD is entered externally, since
+C  it was proven that not all compilers accept a type-new-
+C  declaration of preexisting variables
+C
+      CALL ORTPOL(N,AINT,X,W,IERR,WK(1),WK(N+1),WK(2*N+1),IWK,
+     F            WK(4*N+1),WK(N+2),WK(2*N+3),WK(3*N+4),WKD)
+      RETURN
+      END
+C
+C
+C[BA*)
+C[LE*)
+      SUBROUTINE ORTPOL(N,AINT,X,W,IERR,
+C[IX{ORTPOL}*)
+     F                  Q,RS,DFG,IPFG,GL,WKR,ETA,Z,WKD)
+C[BE*)
+C
+C*****************************************************************
+C                                                                *
+C  Auxiliary routine for ORTOGP.                                 *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required : GAUSS, MULLRP                          *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  author   : Eberhard Heyne                                     *
+C  date     : 05.25.1988                                         *
+C  source   : FORTRAN 77                                         *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DIMENSION AINT(0:2*N-1),Q(0:N),ETA(0:N),W(N),X(N)
+      DIMENSION GL(0:N-1,0:N-1),RS(0:N)
+      DIMENSION DFG(N),IPFG(N),WKR(0:N),Z(0:1,N),WKD(0:N)
+C
+C  System matrix GL and the right hand side RS of the linear system
+C  that determines the polynomial coefficients
+C
+      DO 10 I=0,N-1
+        DO 12 K=0,N-1
+          GL(I,K)=-AINT(I+K)
+12      CONTINUE
+        RS(I)=AINT(I+N)
+10    CONTINUE
+C
+C  solve the system of equations, obtain the polynomial coefficients Q
+C
+      CALL GAUSS(N,GL,N,RS,Q,MARK,DFG,IPFG)
+      IERR=1
+      IF(MARK .EQ. 0) RETURN
+      Q(N)=1.0D0
+C
+C  determine zeros of the polynomial Q
+C
+      CALL MULLRP (N,Q,200,NFND,Z,WKR,WKD)
+      IERR=2
+      IF(NFND .NE. N) RETURN
+      IERR=0
+C
+C  from the theory we know that all zeros must be
+C  real. They are moved from Z to X.
+C
+      DO 1002 K=1,N
+1002    X(K)=Z(0,K)
+C
+C  loop over all zeros
+C
+      DO 14 I=1,N
+C
+C  ETA/F is the LAGRANGE interpolation polynomial for X(I)
+C
+        F=1.0D0
+        ETA(N-1)=1.0D0
+        DO 16 K=N-2,0,-1
+          ETA(K)=Q(K+1) + ETA(K+1)*X(I)
+          F=ETA(K) + F*X(I)
+16      CONTINUE
+C
+C  determine weights W(I) of the quadrature formula
+C
+        W(I)=0.0D0
+        DO 18 K=0,N-1
+          W(I)=W(I) + ETA(K)*AINT(K)/F
+18      CONTINUE
+14    CONTINUE
+      RETURN
+      END

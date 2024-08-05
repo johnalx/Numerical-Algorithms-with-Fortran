@@ -1,0 +1,66 @@
+<html>
+<head>
+<title>fortra77/kap17/vmnorm.for</title>
+</head>
+<body>
+<a name="anfang"</a>
+<hr>
+<a href="#ende">End of file</a><br>
+<a href="../../inhalt.htm#fortra77kap17vmnormfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+<font size=+2>
+<pre>
+
+<a name="VMNORM3"</a>      DOUBLE PRECISION FUNCTION VMNORM (VECTOR,N)
+C
+C*****************************************************************
+C                                                                *
+C This FUNCTION routine determines the maximum norm of a vector. *
+C                                                                *
+C                                                                *
+C INPUT PARAMETERS:                                              *
+C =================                                              *
+C VECTOR  : DOUBLE PRECISION vector VECTOR(1:N)                  *
+C N       : size of the vector                                   *
+C                                                                *
+C                                                                *
+C LOCAL VARIABLE:                                                *
+C ===============                                                *
+C I       : loop variable                                        *
+C                                                                *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  subroutines required: none                                    *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author  : Volker Kr&uuml;ger                                     *
+C  Date    : 07.08.1990                                        *
+C  Source  : FORTRAN 77                                        *
+C                                                                *
+C*****************************************************************
+C
+C Declaration
+C
+      DOUBLE PRECISION VECTOR(N)
+C
+C Compute maximum norm
+C
+      VMNORM=DABS(VECTOR(1))
+      DO 10 I=2,N
+         VMNORM=DMAX1(VMNORM,DABS(VECTOR(I)))
+10    CONTINUE
+      RETURN
+      END
+</font>
+</pre>
+<a name="ende"</a>
+<hr>
+<a href="#anfang">Begin of file</a><br>
+<a href="../../inhalt.htm#fortra77kap17vmnormfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+</body>
+</html>

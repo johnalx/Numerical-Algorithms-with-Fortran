@@ -1,0 +1,188 @@
+<html>
+<head>
+<title>fortra77/kap08/ffakon.for</title>
+</head>
+<body>
+<a name="anfang"</a>
+<hr>
+<a href="#ende">End of file</a><br>
+<a href="../../inhalt.htm#fortra77kap08ffakonfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+<font size=+2>
+<pre>
+
+<a name="FFAKON3"</a>      SUBROUTINE FFAKON (M, FRE, FIM, N, HRE, HIM, L, DELTAX,
+     +                   IND, IERR)
+C
+C*****************************************************************
+C                                                                *
+C  This program uses the fast Fourier transform (FFT) to compute * 
+C  approximations for the convolution                            *
+C                                                                *
+C      Falt(j) = (INTEGRAL of) F(xj-t) * H(t) dt                 *
+C                                                                *
+C  or approximations for the correlation                         *
+C                                                                *
+C      Korr(j) = (INTEGRAL of) F(xj+t)*CONJG(H(t)) dt            *
+C                                                                *
+C  for  j = 0, 1, ... , M+N .                                    *  
+C  Here F and H are two nonperiodic functions given by their     *
+C  funktional values  F(0), F(1), ... F(M) and  H(0), H(1), ... ,*
+C  H(N)  at equidistant nodes with uniform distance DELTAX.      *
+C  These nodes lie in the support of F and G.                    *
+C                                                                *
+C                                                                *
+C  INPUT PARAMETERS:                                             *
+C  =================                                             *
+C  M        : M+1  functional values of F are given with real    *
+C             and imaginary parts  FRE(j)  and  FIM(j)  for      *
+C             j = 0, 1, ... , M.                                 * 
+C  FRE, FIM : DOUBLE PRECISION vectors of length L . The first   *
+C             M+1 entries contain the real and imaginary parts   *
+C             of the functional values of F.                     *
+C  N        : N+1 functional values of H are given by their      *
+C             real and imaginary parts  HRE(j)  and  HIM(j)  for *
+C             j = 0, 1, ... , N.                                 * 
+C  HRE, HIM : DOUBLE PRECISION vectors of length L . The first   *
+C             N+1 entries contain the real and imaginary parts   *
+C             of the function values of H .                      *           
+C  L        : Length of the vectors  FRE, FIM andnd  HRE, HIM.   *
+C             L must be a power of 2 ( L = 2**ITAU for a positive*
+C             integer ITAU ) and  L >= M+N+1 .                   *
+C  DELTAX   : distance of nodes of the given function values. .  *
+C  IND      : parameter to create approximations of the          *
+C             convolution or the correlation as desired:         *
+C             IND = 0              - Compute approximations for  *
+C                                    the convolution.            *
+C             IND different from 0 - Compute approximations for  *
+C                                    the correlation.            *
+C                                                                *
+C                                                                *
+C  OUTPUT PARAMETERS:                                            *
+C  ==================                                            *
+C  FRE, FIM : DOUBLE PRECISION vectors for the real and imaginary*
+C             parts of  M+N  complex numbers.  The contents of   *
+C             FRE(j) and FIM(j) depends on the setting of IND and*
+C             either the approximate values of the convolution   *
+C             Falt(j) or of the correlation Korr(j) are given    *
+C             for j = 0, 1, ... , M+N .                          *
+C  HRE, HIM : DOUBLE PRECISION vectors for the real and imaginary*
+C             of comlpex numbers. Contain the discrete Fourier   *
+C             coefficients of H as they are needed for           *
+C             convoluting or correlating. (Auxiliary arrays.)    *
+C  IERR     : Error parameter                                    *
+C             = 0 : all o.k.                                     *
+C             = 1 : L is improper.                               *
+C                                                                *
+C----------------------------------------------------------------*
+C                                                                *
+C  Subroutines used: FFT                                         *
+C                                                                *
+C*****************************************************************
+C                                                                *
+C  Author      : Klaus Niederdrenk                               *
+C  Date        : 09.08.1994                                      *
+C  Source code : FORTRAN 77                                      *
+C                                                                *
+C*****************************************************************
+C
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      INTEGER M, N, L, IND, IERR ,ITAU 
+      DIMENSION FRE(0:L-1), FIM(0:L-1), HRE(0:L-1), HIM(0:L-1)
+C
+C     complex multiplication: Real part
+C
+      CMLR(AR,AI,BR,BI)=AR*BR-AI*BI
+C
+C     complex multiplication: Imaginary part
+C
+      CMLI(AR,AI,BR,BI)=AR*BI+AI*BR
+C
+C     Check input parameter
+C
+      ITAU=NINT(LOG(REAL(L))/LOG(2.0)) 
+      IF((2**ITAU .NE. L) .OR. (L .LE. M+N)) THEN
+        IERR=1
+        RETURN
+      ELSE
+        IERR=0
+      ENDIF
+C
+C*****************************************************************
+C     Preassign values to elongated vectors                      *
+C*****************************************************************
+C
+      IF(IND .EQ. 0) THEN
+        DO 10 J = M+1, L-1
+          FRE(J)=0.0D0
+          FIM(J)=0.0D0
+  10    CONTINUE
+      ELSE
+        DO 20 J = M+N+1, L-1
+          FRE(J)=0.0D0
+          FIM(J)=0.0D0
+  20    CONTINUE
+        DO 30 J = M+N, N, -1
+          FRE(J)=FRE(J-N)
+          FIM(J)=FIM(J-N)
+  30    CONTINUE
+        DO 40 J = 0, N-1
+          FRE(J)=0.0D0
+          FIM(J)=0.0D0
+  40    CONTINUE
+      ENDIF
+      DO 50 J = N+1, L-1
+        HRE(J)=0.0D0
+        HIM(J)=0.0D0
+  50  CONTINUE
+C      
+C*****************************************************************
+C     Compute necessary discrete Fourier coefficients via FFT    *
+C     for powers of two                                          *
+C*****************************************************************
+C
+      CALL FFT(ITAU,FRE,FIM,0)
+      CALL FFT(ITAU,HRE,HIM,0)
+C
+      IF(IND .EQ. 0) THEN
+        DO 100 K = 0, L-1
+          H      = CMLR(FRE(K),FIM(K),HRE(K),HIM(K)) 
+          FIM(K) = CMLI(FRE(K),FIM(K),HRE(K),HIM(K))
+          FRE(K) = H
+ 100    CONTINUE
+      ELSE
+        DO 110 K = 0, L-1
+          H      = CMLR(FRE(K),FIM(K),HRE(K),-HIM(K))
+          FIM(K) = CMLI(FRE(K),FIM(K),HRE(K),-HIM(K))
+          FRE(K) = H
+ 110    CONTINUE
+      ENDIF
+C
+C*****************************************************************
+C     Compute corresponding functional values                    *
+C*****************************************************************
+C
+      CALL FFT(ITAU,FRE,FIM,1)
+C
+      X = DBLE(L)*DELTAX
+      DO 200 J = 0, M+N
+        FRE(J) = X*FRE(J)
+        FIM(J) = X*FIM(J)
+ 200  CONTINUE
+      DO 210 J = M+N+1, L-1
+        FRE(J) = 0.0D0
+        FIM(J) = 0.0D0
+ 210  CONTINUE
+      RETURN
+      END
+</font>
+</pre>
+<a name="ende"</a>
+<hr>
+<a href="#anfang">Begin of file</a><br>
+<a href="../../inhalt.htm#fortra77kap08ffakonfor">Contents</a><br>
+<a href="../../index.htm">Index</a>
+<hr>
+</body>
+</html>
